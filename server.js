@@ -1,5 +1,6 @@
 'use strict';
-// Çizgi Stok sunucusu: Node.js (yerleşik sqlite) — dış bağımlılık yok.
+// Çizgi İş Takibi sunucusu: Node.js 22 (yerleşik sqlite) — dış bağımlılık yok.
+// Giriş/oturum yapısı Çizgi Stok ile aynıdır.
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -7,24 +8,21 @@ const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 
 const DATA = process.env.DATA_DIR || path.join(__dirname, 'data');
-const PHOTOS = path.join(DATA, 'photos');
 const BACKUPS = path.join(DATA, 'backups');
 const SETUP_CODE = process.env.SETUP_CODE || '';
-const AI_MODEL = process.env.AI_MODEL || 'claude-haiku-5-5';
 const PORT = Number(process.env.PORT || 3000);
 const SECURE_COOKIE = process.env.INSECURE_COOKIE ? '' : '; Secure';
-for (const d of [DATA, PHOTOS, BACKUPS]) fs.mkdirSync(d, { recursive: true });
+for (const d of [DATA, BACKUPS]) fs.mkdirSync(d, { recursive: true });
 
-const db = new DatabaseSync(path.join(DATA, 'stok.db'));
+const db = new DatabaseSync(path.join(DATA, 'isler.db'));
 db.exec(`
 PRAGMA journal_mode=WAL;
 CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, pass TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'user');
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, user_id INTEGER NOT NULL, expires INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS pgroups(id TEXT PRIMARY KEY, name TEXT NOT NULL, prefix TEXT UNIQUE NOT NULL, ord INTEGER NOT NULL DEFAULT 0, next INTEGER NOT NULL DEFAULT 1);
-CREATE TABLE IF NOT EXISTS products(id TEXT PRIMARY KEY, code TEXT NOT NULL, num INTEGER NOT NULL, name TEXT NOT NULL DEFAULT '', group_id TEXT NOT NULL, stock INTEGER NOT NULL DEFAULT 0, min INTEGER NOT NULL DEFAULT 0, ord INTEGER NOT NULL DEFAULT 0, photo TEXT, price REAL, cost REAL, created_at INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS moves(id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER NOT NULL, day TEXT NOT NULL, pid TEXT, code TEXT, name TEXT, d INTEGER NOT NULL, after INTEGER NOT NULL, kind TEXT NOT NULL, note TEXT DEFAULT '', cost REAL, user TEXT DEFAULT '');
-CREATE INDEX IF NOT EXISTS moves_day ON moves(day);
-CREATE INDEX IF NOT EXISTS moves_pid ON moves(pid);
+CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, data TEXT NOT NULL, created_at INTEGER NOT NULL, created_by TEXT NOT NULL DEFAULT '',
+  updated_at INTEGER NOT NULL, updated_by TEXT NOT NULL DEFAULT '', deleted_at INTEGER);
+CREATE TABLE IF NOT EXISTS joblog(id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL, t INTEGER NOT NULL, user TEXT NOT NULL DEFAULT '', changes TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS joblog_job ON joblog(job_id, t);
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
 `);
 
@@ -39,12 +37,8 @@ function tx(fn) {
   try { const r = fn(); db.exec('COMMIT'); return r; }
   catch (e) { try { db.exec('ROLLBACK'); } catch (_) {} throw e; }
 }
-const setting = k => { const r = get('SELECT value FROM settings WHERE key=?', k); return r ? r.value : null; };
-const setSetting = (k, v) => run('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', k, v);
 const newId = () => crypto.randomBytes(10).toString('hex');
-const fmt = (pfx, n) => pfx + '-' + String(n).padStart(3, '0');
 const dayKey = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-const KINDS = new Set(['giris', 'cikis', 'sayim']);
 
 class HttpError extends Error { constructor(code, msg) { super(msg); this.code = code; } }
 const fail = (code, msg) => { throw new HttpError(code, msg); };
@@ -98,7 +92,7 @@ function noteFail(ip) {
 function readBody(req, limit) {
   return new Promise((resolve, reject) => {
     const chunks = []; let size = 0;
-    req.on('data', c => { size += c.length; if (size > limit) { reject(new HttpError(413, 'Dosya çok büyük.')); req.destroy(); } else chunks.push(c); });
+    req.on('data', c => { size += c.length; if (size > limit) { reject(new HttpError(413, 'İstek çok büyük.')); req.destroy(); } else chunks.push(c); });
     req.on('end', () => resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
@@ -113,106 +107,116 @@ function send(res, code, obj) {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': b.length, 'Cache-Control': 'no-store' });
   res.end(b);
 }
-const num = (v, def = null) => (typeof v === 'number' && isFinite(v) ? v : def);
-const int = v => { const n = Math.round(Number(v)); return isFinite(n) ? n : null; };
-const money = v => (v === null || v === '' || v === undefined ? null : (typeof v === 'number' && isFinite(v) && v >= 0 ? Math.round(v * 100) / 100 : fail(400, 'Fiyat geçersiz.')));
 const str = (v, max) => String(v ?? '').trim().slice(0, max);
-const photoPath = id => (/^[a-f0-9]{20,40}$/.test(id) ? path.join(PHOTOS, id + '.jpg') : null);
 
-/* ---------- veri işlemleri ---------- */
-function productRow(p) {
-  return { id: p.id, code: p.code, num: p.num, name: p.name, groupId: p.group_id, stock: p.stock, min: p.min, order: p.ord, photo: p.photo, price: p.price, cost: p.cost, createdAt: p.created_at };
-}
-function groupRow(g) { return { id: g.id, name: g.name, prefix: g.prefix, order: g.ord, next: g.next }; }
-function logMove(m, user) {
-  const t = Date.now();
-  run('INSERT INTO moves(t,day,pid,code,name,d,after,kind,note,cost,user) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
-    t, dayKey(new Date(t)), m.pid, m.code, m.name || '', m.d, m.after, m.kind, m.note || '', m.cost ?? null, user || '');
-}
-function nextNumber(g) {
-  const r = get('SELECT MAX(num) AS m FROM products WHERE group_id=?', g.id);
-  return Math.max(g.next || 1, (r.m || 0) + 1);
-}
-function nextOrder(gid) { const r = get('SELECT MAX(ord) AS m FROM products WHERE group_id=?', gid); return (r.m || 0) + 1; }
-function normPrefix(s) {
-  return String(s || '').toLocaleUpperCase('tr').replace(/Ç/g, 'C').replace(/Ğ/g, 'G').replace(/İ/g, 'I').replace(/Ö/g, 'O').replace(/Ş/g, 'S').replace(/Ü/g, 'U').replace(/[^A-Z0-9]/g, '').slice(0, 4);
-}
+/* ---------- iş alanları ---------- */
+const STAGES = ['ÖLÇÜ ALINACAK', 'FİYAT AŞAMASINDA', 'TASARIM', 'İMALAT', 'MONTAJ', 'TESLİM EDİLDİ'];
+const YESNO = new Set(['EVET', 'HAYIR']);
+const FIELDS = ['tarih', 'fisNo', 'firma', 'tanim', 'maliyet', 'satis', 'kapora', 'termin', 'donus', 'alindi', 'durum', 'not'];
+const MONEY = new Set(['maliyet', 'satis', 'kapora']);
+const isDate = v => /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v + 'T00:00:00Z'));
 
-async function classify(photoId) {
-  const key = setting('ai_key');
-  if (!key) fail(400, 'Yapay zeka anahtarı girilmemiş. Ayarlar bölümünden ekleyin.');
-  const file = photoPath(photoId);
-  if (!file || !fs.existsSync(file)) fail(404, 'Fotoğraf bulunamadı.');
-  const groups = all('SELECT id,name FROM pgroups ORDER BY ord');
-  if (!groups.length) fail(400, 'Önce bir grup ekleyin.');
-  const prompt = `Bu fotoğraf bir tabela ve reklam dükkanındaki bir ürün. Ürünü şu gruplardan tam olarak birine koy: ${groups.map(g => JSON.stringify(g.name)).join(', ')}. Yalnızca şu JSON'u döndür, başka hiçbir şey yazma: {"group":"<listedeki adın birebir aynısı>","name":"<ürünün kısa Türkçe adı, en fazla 5 kelime>"}`;
-  let r;
-  try {
-    r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: AI_MODEL, max_tokens: 200, messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fs.readFileSync(file).toString('base64') } },
-        { type: 'text', text: prompt }] }] }),
-      signal: AbortSignal.timeout(40000)
-    });
-  } catch (e) { fail(502, 'Yapay zekaya ulaşılamadı.'); }
-  if (!r.ok) {
-    const code = r.status;
-    fail(502, code === 401 ? 'Yapay zeka anahtarı geçersiz.' : code === 429 ? 'Yapay zeka şu an yoğun, biraz sonra deneyin.' : code === 400 ? 'Yapay zeka isteği reddetti (hesap bakiyesi bitmiş olabilir).' : 'Yapay zeka hata verdi (' + code + ').');
+// Tek alanı doğrula ve sakla biçimine çevir. Boş değer null olur.
+function clean(k, v) {
+  if (v === undefined || v === null || v === '') return null;
+  if (MONEY.has(k)) {
+    if (typeof v !== 'number' || !isFinite(v) || v < 0 || v > 1e10) fail(400, 'Tutar geçersiz.');
+    return Math.round(v * 100) / 100;
   }
-  const j = await r.json();
-  const text = (j.content || []).map(c => c.text || '').join('');
-  let v = {}; try { v = JSON.parse((text.match(/\{[\s\S]*\}/) || ['{}'])[0]); } catch (_) {}
-  const g = groups.find(x => x.name.toLocaleLowerCase('tr') === String(v.group || '').trim().toLocaleLowerCase('tr'));
-  return g ? { groupId: g.id, name: str(v.name, 60), matched: true } : { groupId: groups[0].id, name: str(v.name, 60), matched: false };
+  if (k === 'tarih' || k === 'termin') { const s = str(v, 10); if (!isDate(s)) fail(400, 'Tarih geçersiz.'); return s; }
+  if (k === 'donus' || k === 'alindi') { const s = str(v, 10).toLocaleUpperCase('tr'); if (!YESNO.has(s)) fail(400, 'Geçersiz seçim.'); return s; }
+  if (k === 'durum') { const s = str(v, 40).toLocaleUpperCase('tr'); if (!STAGES.includes(s)) fail(400, 'Geçersiz durum.'); return s; }
+  if (k === 'firma') return str(v, 120).toLocaleUpperCase('tr') || null;
+  if (k === 'tanim') return str(v, 300) || null;
+  if (k === 'fisNo') return str(v, 40) || null;
+  if (k === 'not') return str(v, 1000) || null;
+  return null;
+}
+const same = (k, a, b) => (a ?? null) === (b ?? null);
+
+function jobRow(r) {
+  return { id: r.id, ...JSON.parse(r.data), createdAt: r.created_at, createdBy: r.created_by, updatedAt: r.updated_at, updatedBy: r.updated_by };
+}
+function logChange(jobId, t, user, changes) {
+  run('INSERT INTO joblog(job_id,t,user,changes) VALUES(?,?,?,?)', jobId, t, user, JSON.stringify(changes));
 }
 
-function exportData(withPhotos) {
-  const products = all('SELECT * FROM products').map(productRow);
-  const out = {
-    format: 'cizgi-stok', version: 1, exportedAt: new Date().toISOString(),
-    groups: all('SELECT * FROM pgroups ORDER BY ord').map(groupRow),
-    products,
-    moves: all('SELECT t,pid,code,name,d,after,kind,note,cost,user FROM moves ORDER BY id'),
-    settings: { vatIncluded: setting('vat_included') === '1', vatRate: Number(setting('vat_rate') ?? 20) }
-  };
-  if (withPhotos) {
-    out.photos = {};
-    for (const p of products) {
-      const f = p.photo && photoPath(p.photo);
-      if (f && fs.existsSync(f)) out.photos[p.photo] = fs.readFileSync(f).toString('base64');
-    }
-  }
-  return out;
+function createJob(input, user) {
+  const data = {};
+  for (const k of FIELDS) data[k] = clean(k, input[k]);
+  if (!data.firma || !data.tanim) fail(400, 'Firma ve iş tanımı gerekli.');
+  const id = newId(), t = Date.now();
+  tx(() => {
+    run('INSERT INTO jobs(id,data,created_at,created_by,updated_at,updated_by) VALUES(?,?,?,?,?,?)', id, JSON.stringify(data), t, user, t, user);
+    logChange(id, t, user, [{ f: '_new' }]);
+  });
+  return jobRow(get('SELECT * FROM jobs WHERE id=?', id));
 }
-function importData(d) {
-  if (!d || d.format !== 'cizgi-stok') fail(400, 'Bu dosya Çizgi Stok yedeği değil.');
-  if (get('SELECT COUNT(*) AS n FROM products').n > 0) fail(409, 'İçe aktarma yalnızca boş sisteme yapılabilir; sistemde zaten ürün var.');
-  const photos = d.photos || {};
-  for (const [id, b64] of Object.entries(photos)) { const f = photoPath(id); if (f) fs.writeFileSync(f, Buffer.from(String(b64), 'base64')); }
+// Sadece gönderilen alanlar yazılır: iki kişi aynı işi düzenlerse birbirinin değişikliğini ezmez.
+function patchJob(id, input, user) {
   return tx(() => {
-    run('DELETE FROM pgroups');
-    for (const g of d.groups || []) run('INSERT INTO pgroups(id,name,prefix,ord,next) VALUES(?,?,?,?,?)', str(g.id, 40), str(g.name, 60), normPrefix(g.prefix), int(g.order) || 0, int(g.next) || 1);
-    for (const p of d.products || []) run('INSERT INTO products(id,code,num,name,group_id,stock,min,ord,photo,price,cost,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
-      str(p.id, 40), str(p.code, 20), int(p.num) || 0, str(p.name, 80), str(p.groupId, 40), Math.max(0, int(p.stock) || 0), Math.max(0, int(p.min) || 0), int(p.order) || 0,
-      p.photo ? str(p.photo, 40) : null, num(p.price), num(p.cost), int(p.createdAt) || Date.now());
-    for (const m of d.moves || []) {
-      const t = int(m.t) || Date.now();
-      run('INSERT INTO moves(t,day,pid,code,name,d,after,kind,note,cost,user) VALUES(?,?,?,?,?,?,?,?,?,?,?)', t, dayKey(new Date(t)), str(m.pid, 40), str(m.code, 20), str(m.name, 80), int(m.d) || 0, int(m.after) || 0, str(m.kind, 10), str(m.note, 160), num(m.cost), str(m.user, 60));
+    const r = get('SELECT * FROM jobs WHERE id=? AND deleted_at IS NULL', id);
+    if (!r) fail(404, 'İş bulunamadı. Başka biri silmiş olabilir.');
+    const data = JSON.parse(r.data), changes = [];
+    for (const k of FIELDS) {
+      if (!(k in input)) continue;
+      const v = clean(k, input[k]);
+      if (!same(k, data[k], v)) { changes.push({ f: k, o: data[k] ?? null, n: v }); data[k] = v; }
     }
-    if (d.settings) { setSetting('vat_included', d.settings.vatIncluded ? '1' : '0'); setSetting('vat_rate', String(int(d.settings.vatRate) ?? 20)); }
-    return { groups: (d.groups || []).length, products: (d.products || []).length, moves: (d.moves || []).length, photos: Object.keys(photos).length };
+    if (!data.firma || !data.tanim) fail(400, 'Firma ve iş tanımı boş bırakılamaz.');
+    if (changes.length) {
+      const t = Date.now();
+      run('UPDATE jobs SET data=?,updated_at=?,updated_by=? WHERE id=?', JSON.stringify(data), t, user, id);
+      logChange(id, t, user, changes);
+    }
+    return jobRow(get('SELECT * FROM jobs WHERE id=?', id));
+  });
+}
+
+/* ---------- yedek / içe aktarma ---------- */
+function exportData() {
+  return {
+    format: 'cizgi-is-takip', version: 1, exportedAt: new Date().toISOString(),
+    jobs: all('SELECT * FROM jobs WHERE deleted_at IS NULL ORDER BY created_at').map(jobRow),
+    log: all('SELECT job_id,t,user,changes FROM joblog ORDER BY id').map(l => ({ jobId: l.job_id, t: l.t, user: l.user, changes: JSON.parse(l.changes) }))
+  };
+}
+// Claude'un hazırladığı aktarım dosyası ya da bu uygulamanın yedeği. Yalnızca boş sisteme.
+// Kullanıcı adı "__owner__" olan kayıtlar, içe aktaran yöneticinin adıyla yazılır.
+function importData(d, me) {
+  if (!d || d.format !== 'cizgi-is-takip') fail(400, 'Bu dosya İş Takibi aktarım dosyası değil.');
+  if (get('SELECT COUNT(*) AS n FROM jobs').n > 0) fail(409, 'İçe aktarma yalnızca boş sisteme yapılabilir; sistemde zaten iş var.');
+  const who = u => (u === '__owner__' || !u ? me.name : str(u, 60));
+  const jobs = Array.isArray(d.jobs) ? d.jobs : [], log = Array.isArray(d.log) ? d.log : [];
+  return tx(() => {
+    const ids = new Set();
+    for (const j of jobs) {
+      const id = str(j.id, 40); if (!/^[\w-]{4,40}$/.test(id) || ids.has(id)) fail(400, 'Aktarım dosyasında geçersiz iş kimliği var.');
+      ids.add(id);
+      const data = {};
+      for (const k of FIELDS) {
+        try { data[k] = clean(k, j[k]); }
+        catch (e) { fail(400, `${str(j.firma, 40) || id} kaydında "${k}" alanı geçersiz.`); }
+      }
+      const c = Number(j.createdAt) || Date.now(), u = Number(j.updatedAt) || c;
+      run('INSERT INTO jobs(id,data,created_at,created_by,updated_at,updated_by) VALUES(?,?,?,?,?,?)', id, JSON.stringify(data), c, who(j.createdBy), u, who(j.updatedBy));
+    }
+    let n = 0;
+    for (const l of log) {
+      if (!ids.has(l.jobId) || !Array.isArray(l.changes)) continue;
+      logChange(l.jobId, Number(l.t) || Date.now(), who(l.user), l.changes.slice(0, 20).map(c => ({ f: str(c.f, 20), o: c.o ?? null, n: c.n ?? null })));
+      n++;
+    }
+    return { jobs: ids.size, log: n };
   });
 }
 
 /* ---------- günlük yedek ---------- */
 function dailyBackup() {
   try {
-    const name = 'stok-' + dayKey(new Date()) + '.db';
-    const target = path.join(BACKUPS, name);
+    const target = path.join(BACKUPS, 'isler-' + dayKey(new Date()) + '.db');
     if (!fs.existsSync(target)) db.exec(`VACUUM INTO '${target.replace(/'/g, "''")}'`);
-    const files = fs.readdirSync(BACKUPS).filter(f => /^stok-\d{4}-\d{2}-\d{2}\.db$/.test(f)).sort();
+    const files = fs.readdirSync(BACKUPS).filter(f => /^isler-\d{4}-\d{2}-\d{2}\.db$/.test(f)).sort();
     for (const f of files.slice(0, Math.max(0, files.length - 14))) fs.unlinkSync(path.join(BACKUPS, f));
   } catch (e) { console.error('Yedek alınamadı:', e.message); }
 }
@@ -236,7 +240,7 @@ async function handle(req, res) {
   if (m === 'GET' && p === '/healthz') return send(res, 200, { ok: true });
 
   const mutating = m !== 'GET' && m !== 'HEAD';
-  if (mutating && req.headers['x-stok'] !== '1') fail(403, 'Geçersiz istek.');
+  if (mutating && req.headers['x-is'] !== '1') fail(403, 'Geçersiz istek.');
 
   // giriş gerektirmeyenler
   if (m === 'GET' && p === '/api/setup-needed') return send(res, 200, { needed: get('SELECT COUNT(*) AS n FROM users').n === 0 });
@@ -274,158 +278,29 @@ async function handle(req, res) {
   }
   if (m === 'GET' && p === '/api/me') return send(res, 200, me);
 
-  if (m === 'GET' && p.startsWith('/photos/')) {
-    const f = photoPath(p.slice(8).replace(/\.jpg$/, ''));
-    if (!f || !fs.existsSync(f)) { res.writeHead(404); return res.end(); }
-    res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=31536000, immutable' });
-    return fs.createReadStream(f).pipe(res);
-  }
-
   if (m === 'GET' && p === '/api/state') {
-    return send(res, 200, {
-      me,
-      groups: all('SELECT * FROM pgroups ORDER BY ord').map(groupRow),
-      products: all('SELECT * FROM products').map(productRow),
-      settings: { vatIncluded: setting('vat_included') === '1', vatRate: Number(setting('vat_rate') ?? 20), aiConfigured: !!setting('ai_key') }
-    });
+    return send(res, 200, { me, stages: STAGES, jobs: all('SELECT * FROM jobs WHERE deleted_at IS NULL').map(jobRow) });
   }
 
-  /* gruplar */
-  if (m === 'POST' && p === '/api/groups') {
-    const b = await readJson(req);
-    const name = str(b.name, 60), prefix = normPrefix(b.prefix);
-    if (!name || !prefix) fail(400, 'Ad ve kod ön eki gerekli.');
-    if (get('SELECT 1 FROM pgroups WHERE prefix=?', prefix)) fail(409, prefix + ' ön eki zaten kullanılıyor.');
-    const ord = (get('SELECT MAX(ord) AS m FROM pgroups').m || 0) + 1;
-    const id = newId();
-    run('INSERT INTO pgroups(id,name,prefix,ord,next) VALUES(?,?,?,?,1)', id, name, prefix, ord);
-    return send(res, 200, { id });
-  }
+  /* işler */
+  if (m === 'POST' && p === '/api/jobs') return send(res, 200, createJob(await readJson(req), me.name));
   let mm;
-  if (m === 'DELETE' && (mm = p.match(/^\/api\/groups\/([\w-]+)$/))) {
-    if (get('SELECT 1 FROM products WHERE group_id=?', mm[1])) fail(409, 'Grupta ürün varken grup silinemez.');
-    run('DELETE FROM pgroups WHERE id=?', mm[1]);
-    return send(res, 200, { ok: true });
-  }
-
-  /* fotoğraf */
-  if (m === 'POST' && p === '/api/photos') {
-    if (!/^image\/jpeg/.test(req.headers['content-type'] || '')) fail(415, 'Fotoğraf JPEG olarak gönderilmeli.');
-    const b = await readBody(req, 12e6);
-    if (b.length < 100 || b[0] !== 0xff || b[1] !== 0xd8) fail(400, 'Geçerli bir JPEG değil.');
-    const id = crypto.randomBytes(16).toString('hex');
-    fs.writeFileSync(photoPath(id), b);
-    return send(res, 200, { id });
-  }
-  if (m === 'POST' && p === '/api/classify') {
-    const b = await readJson(req);
-    return send(res, 200, await classify(str(b.photo, 40)));
-  }
-
-  /* ürünler */
-  if (m === 'POST' && p === '/api/products') {
-    const b = await readJson(req);
-    const stock = Math.max(0, int(b.stock) || 0), name = str(b.name, 80), photo = b.photo ? str(b.photo, 40) : null;
-    if (photo && !photoPath(photo)) fail(400, 'Fotoğraf geçersiz.');
-    const prod = tx(() => {
-      const g = get('SELECT * FROM pgroups WHERE id=?', str(b.groupId, 40));
-      if (!g) fail(400, 'Grup bulunamadı.');
-      const n = nextNumber(g), id = newId(), code = fmt(g.prefix, n);
-      run('INSERT INTO products(id,code,num,name,group_id,stock,min,ord,photo,price,cost,created_at) VALUES(?,?,?,?,?,?,0,?,?,NULL,NULL,?)', id, code, n, name, g.id, stock, nextOrder(g.id), photo, Date.now());
-      run('UPDATE pgroups SET next=? WHERE id=?', n + 1, g.id);
-      if (stock > 0) logMove({ pid: id, code, name, d: stock, after: stock, kind: 'ilk', note: 'Ürün eklendi' }, me.name);
-      return get('SELECT * FROM products WHERE id=?', id);
-    });
-    return send(res, 200, productRow(prod));
-  }
-  if ((mm = p.match(/^\/api\/products\/([\w-]+)(\/stock|\/reorder)?$/))) {
-    const id = mm[1], sub = mm[2] || '';
-    if (m === 'PATCH' && !sub) {
-      const b = await readJson(req);
-      const out = tx(() => {
-        const prod = get('SELECT * FROM products WHERE id=?', id); if (!prod) fail(404, 'Ürün bulunamadı.');
-        if ('name' in b) run('UPDATE products SET name=? WHERE id=?', str(b.name, 80), id);
-        if ('min' in b) run('UPDATE products SET min=? WHERE id=?', Math.max(0, int(b.min) || 0), id);
-        if ('price' in b) run('UPDATE products SET price=? WHERE id=?', money(b.price), id);
-        if ('groupId' in b && b.groupId !== prod.group_id) {
-          const g = get('SELECT * FROM pgroups WHERE id=?', str(b.groupId, 40)); if (!g) fail(400, 'Grup bulunamadı.');
-          const n = nextNumber(g);
-          run('UPDATE products SET group_id=?,num=?,code=?,ord=? WHERE id=?', g.id, n, fmt(g.prefix, n), nextOrder(g.id), id);
-          run('UPDATE pgroups SET next=? WHERE id=?', n + 1, g.id);
-        }
-        return get('SELECT * FROM products WHERE id=?', id);
-      });
-      return send(res, 200, productRow(out));
+  if ((mm = p.match(/^\/api\/jobs\/([\w-]{4,40})(\/log)?$/))) {
+    const id = mm[1];
+    if (m === 'GET' && mm[2]) {
+      return send(res, 200, all('SELECT t,user,changes FROM joblog WHERE job_id=? ORDER BY t DESC, id DESC LIMIT 200', id).map(l => ({ t: l.t, user: l.user, changes: JSON.parse(l.changes) })));
     }
-    if (m === 'POST' && sub === '/stock') {
-      const b = await readJson(req);
-      const out = tx(() => {
-        const prod = get('SELECT * FROM products WHERE id=?', id); if (!prod) fail(404, 'Ürün bulunamadı.');
-        const v = int(b.value); if (v === null) fail(400, 'Adet geçersiz.');
-        const after = b.mode === 'set' ? v : prod.stock + v;
-        if (after < 0) fail(400, `Stokta ${prod.stock} adet var; bu kadar çıkış yapılamaz.`);
-        const d = after - prod.stock;
-        if (d === 0) return prod;
-        let kind = KINDS.has(b.kind) ? b.kind : (d > 0 ? 'giris' : 'cikis');
-        const cost = kind === 'giris' && b.cost !== undefined && b.cost !== null ? money(b.cost) : null;
-        run('UPDATE products SET stock=? WHERE id=?', after, id);
-        if (cost !== null) run('UPDATE products SET cost=? WHERE id=?', cost, id);
-        logMove({ pid: id, code: prod.code, name: prod.name, d, after, kind, note: str(b.note, 160), cost }, me.name);
-        return get('SELECT * FROM products WHERE id=?', id);
-      });
-      return send(res, 200, productRow(out));
-    }
-    if (m === 'POST' && sub === '/reorder') {
-      const b = await readJson(req);
+    if (m === 'PATCH' && !mm[2]) return send(res, 200, patchJob(id, await readJson(req), me.name));
+    if (m === 'DELETE' && !mm[2]) {
+      needAdmin();
       tx(() => {
-        const prod = get('SELECT * FROM products WHERE id=?', id); if (!prod) fail(404, 'Ürün bulunamadı.');
-        const list = all('SELECT id,ord FROM products WHERE group_id=? ORDER BY ord,created_at', prod.group_id);
-        const i = list.findIndex(x => x.id === id), j = i + (b.dir < 0 ? -1 : 1);
-        if (j < 0 || j >= list.length) return;
-        list.forEach((x, k) => { x.ord = k + 1; });
-        [list[i].ord, list[j].ord] = [list[j].ord, list[i].ord];
-        for (const x of list) run('UPDATE products SET ord=? WHERE id=?', x.ord, x.id);
+        if (!get('SELECT 1 FROM jobs WHERE id=? AND deleted_at IS NULL', id)) fail(404, 'İş bulunamadı.');
+        const t = Date.now();
+        run('UPDATE jobs SET deleted_at=? WHERE id=?', t, id);
+        logChange(id, t, me.name, [{ f: '_del' }]);
       });
       return send(res, 200, { ok: true });
     }
-    if (m === 'DELETE' && !sub) {
-      const prod = tx(() => {
-        const prod = get('SELECT * FROM products WHERE id=?', id); if (!prod) fail(404, 'Ürün bulunamadı.');
-        logMove({ pid: id, code: prod.code, name: prod.name, d: -prod.stock, after: 0, kind: 'sil', note: 'Ürün silindi' }, me.name);
-        run('DELETE FROM products WHERE id=?', id);
-        return prod;
-      });
-      const f = prod.photo && photoPath(prod.photo);
-      if (f) fs.rm(f, { force: true }, () => {});
-      return send(res, 200, { ok: true });
-    }
-  }
-
-  /* hareketler */
-  if (m === 'GET' && p === '/api/moves') {
-    const days = Math.min(366, Math.max(1, int(url.searchParams.get('days')) || 31));
-    const since = dayKey(new Date(Date.now() - (days - 1) * 864e5));
-    const pid = url.searchParams.get('pid');
-    const rows = pid
-      ? all('SELECT * FROM moves WHERE pid=? ORDER BY t DESC LIMIT 2000', pid)
-      : all('SELECT * FROM moves WHERE day>=? ORDER BY t DESC LIMIT 5000', since);
-    return send(res, 200, rows);
-  }
-
-  /* ayarlar */
-  if (m === 'PUT' && p === '/api/settings') {
-    const b = await readJson(req);
-    const r = int(b.vatRate); if (r === null || r < 0 || r > 100) fail(400, 'KDV oranı 0–100 arası olmalı.');
-    setSetting('vat_included', b.vatIncluded ? '1' : '0'); setSetting('vat_rate', String(r));
-    return send(res, 200, { ok: true });
-  }
-  if (m === 'PUT' && p === '/api/settings/ai') {
-    needAdmin();
-    const b = await readJson(req);
-    const key = str(b.key, 300);
-    if (key && !/^sk-ant-[\w-]{20,}$/.test(key)) fail(400, 'Bu bir Anthropic API anahtarına benzemiyor (sk-ant- ile başlamalı).');
-    if (key) setSetting('ai_key', key); else run("DELETE FROM settings WHERE key='ai_key'");
-    return send(res, 200, { ok: true, aiConfigured: !!key });
   }
 
   /* kullanıcılar */
@@ -460,15 +335,14 @@ async function handle(req, res) {
 
   /* yedek */
   if (m === 'GET' && p === '/api/export') {
-    const b = Buffer.from(JSON.stringify(exportData(url.searchParams.get('photos') !== '0')));
+    const b = Buffer.from(JSON.stringify(exportData()));
     res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Length': b.length, 'Cache-Control': 'no-store',
-      'Content-Disposition': `attachment; filename="cizgi-stok-yedek-${dayKey(new Date())}.json"` });
+      'Content-Disposition': `attachment; filename="is-takip-yedek-${dayKey(new Date())}.json"` });
     return res.end(b);
   }
   if (m === 'POST' && p === '/api/import') {
     needAdmin();
-    const b = await readJson(req, 300e6);
-    return send(res, 200, importData(b));
+    return send(res, 200, importData(await readJson(req, 50e6), me));
   }
 
   fail(404, 'Bulunamadı.');
@@ -481,4 +355,4 @@ http.createServer((req, res) => {
     console.error(e);
     send(res, 500, { error: 'Sunucu hatası. Tekrar deneyin.' });
   });
-}).listen(PORT, () => console.log('Çizgi Stok ' + PORT + ' portunda çalışıyor'));
+}).listen(PORT, () => console.log('Çizgi İş Takibi ' + PORT + ' portunda çalışıyor'));
