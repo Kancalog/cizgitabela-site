@@ -90,6 +90,34 @@ section{padding:96px 0;position:relative}
 .lang-switch button[aria-pressed="true"]{background:var(--text);color:#141414}
 .lang-switch button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
+
+/* ---------- üst menü ---------- */
+.nav-links{display:flex;align-items:center;gap:4px}
+.nav-links a{position:relative;padding:10px 12px;font:600 14.5px/1 Inter;color:#d9d4cd;border-radius:999px;transition:color .2s,background .2s}
+.nav-links a:hover{color:var(--text);background:rgba(255,255,255,.06)}
+.nav-links a.on{color:var(--text)}
+.nav-links a.on::after{content:"";position:absolute;left:12px;right:12px;bottom:3px;height:2px;border-radius:2px;background:var(--accent)}
+.nav-links a:focus-visible,.menu-panel a:focus-visible,.menu-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.menu-btn{display:none;width:44px;height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.22);background:rgba(14,14,16,.45);cursor:pointer;flex-direction:column;align-items:center;justify-content:center;gap:5px}
+.menu-btn span{display:block;width:18px;height:2px;border-radius:2px;background:var(--text);transition:transform .25s,opacity .2s}
+.menu-btn[aria-expanded="true"] span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.menu-btn[aria-expanded="true"] span:nth-child(2){opacity:0}
+.menu-btn[aria-expanded="true"] span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+.menu-panel{background:rgba(14,14,16,.97);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:8px 20px 22px;max-height:calc(100svh - 72px);overflow:auto}
+.menu-panel nav{display:flex;flex-direction:column}
+.menu-panel nav a{padding:15px 4px;font:700 22px/1.1 var(--head);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.menu-panel nav a::after{content:"→";color:var(--muted);font:500 18px Inter}
+.menu-panel nav a.on{color:var(--accent)}
+.menu-panel .lang-switch{display:inline-flex;margin-top:18px}
+.nav.menu-open{background:rgba(14,14,16,.97)}
+@media (max-width:1060px){
+  .nav-links{display:none}
+  .menu-btn{display:flex}
+  .nav-right>.lang-switch{display:none}
+}
+@media (min-width:1061px){ .menu-panel{display:none!important} }
+@media (max-width:620px){ .nav .btn-accent{padding:0 14px} }
+
 /* ---------- hero ---------- */
 .hero{min-height:100svh;display:flex;align-items:flex-end;padding:0 0 12vh;overflow:hidden;isolation:isolate}
 .hero-stage{position:absolute;inset:-30px;z-index:-3;transition:transform .3s ease-out;will-change:transform}
@@ -348,10 +376,11 @@ section.pin{padding:0}
 
 <header class="nav" id="nav">
   <div class="wrap">
-    <a href="#" class="brand">
+    <a href="#hero" class="brand">
       <img src="img/logo.png" alt="Çizgi Tabela Reklam logosu" width="48" height="48">
       <span>Çizgi Tabela Reklam<small>Süleymanpaşa · Tekirdağ</small></span>
     </a>
+    <nav class="nav-links" aria-label="Ana menü"><a href="#hero" data-nav="home">Ana Sayfa</a><a href="#hizmetler" data-nav="hizmetler">Hizmetler</a><a href="#vitrin" data-nav="vitrin">Ürünler</a><a href="#galeri" data-nav="ref">Referanslar</a><a href="#iletisim" data-nav="iletisim">İletişim</a></nav>
     <div class="nav-right">
       <div class="lang-switch" role="group" aria-label="Dil seçimi">
         <button type="button" data-lang="tr" aria-pressed="true">TR</button><button type="button" data-lang="en" aria-pressed="false">EN</button>
@@ -360,11 +389,18 @@ section.pin{padding:0}
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>
         Ara
       </a>
+      <button type="button" class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="menuPanel" aria-label="Menüyü aç"><span></span><span></span><span></span></button>
     </div>
+  </div>
+  <div class="menu-panel" id="menuPanel" hidden>
+    <nav aria-label="Mobil menü"><a href="#hero" data-nav="home">Ana Sayfa</a><a href="#hizmetler" data-nav="hizmetler">Hizmetler</a><a href="#vitrin" data-nav="vitrin">Ürünler</a><a href="#galeri" data-nav="ref">Referanslar</a><a href="#iletisim" data-nav="iletisim">İletişim</a></nav>
+    <div class="lang-switch" role="group" aria-label="Dil seçimi">
+        <button type="button" data-lang="tr" aria-pressed="true">TR</button><button type="button" data-lang="en" aria-pressed="false">EN</button>
+      </div>
   </div>
 </header>
 
-<section class="hero" id="hero" aria-label="Giriş">
+<section data-sec="home" class="hero" id="hero" aria-label="Giriş">
   <div class="hero-stage" id="heroStage" role="img" aria-label="Çizgi Tabela Reklam showroom'u: kutu harfler, fener tabelalar ve ışıklı panolar">
     <div class="hero-img off"></div>
     <div class="hero-img on"></div>
@@ -386,7 +422,7 @@ section.pin{padding:0}
 </section>
 
 
-<section class="pin" id="fener" aria-label="Kutu harf nasıl yapılır">
+<section data-sec="home" class="pin" id="fener" aria-label="Kutu harf nasıl yapılır">
   <div class="pin-stage">
     <div class="kicker pin-kicker">Kutu harf</div>
     <div class="fn-lines" aria-hidden="true">
@@ -404,7 +440,7 @@ section.pin{padding:0}
   </div>
 </section>
 
-<section id="hizmetler">
+<section data-sec="hizmetler" id="hizmetler">
   <div class="wrap">
     <div class="kicker reveal">Ne yapıyoruz</div>
     <h2 class="reveal" data-liquid>Hizmetler</h2>
@@ -460,7 +496,7 @@ section.pin{padding:0}
 </section>
 
 
-<section class="pin" id="vitrin" aria-label="Ürün vitrini">
+<section data-sec="vitrin" class="pin" id="vitrin" aria-label="Ürün vitrini">
   <div class="pin-stage">
     <div class="lu-head">
       <h2>Ürün vitrini<em>.</em></h2>
@@ -490,7 +526,7 @@ section.pin{padding:0}
   </div>
 </section>
 
-<section class="pin" id="sahne" aria-label="Sahadan işler">
+<section data-sec="ref" class="pin" id="sahne" aria-label="Sahadan işler">
   <div class="pin-stage">
     <div class="kicker pin-kicker">Sahadan</div>
     <div class="sc-count" aria-hidden="true"><em id="scNo">01</em> / 03</div>
@@ -504,7 +540,7 @@ section.pin{padding:0}
   </div>
 </section>
 
-<section id="galeri" style="background:var(--surface-2);border-block:1px solid var(--line)">
+<section data-sec="ref" id="galeri" style="background:var(--surface-2);border-block:1px solid var(--line)">
   <div class="wrap">
     <div class="kicker reveal">Sahadan</div>
     <h2 class="reveal" data-liquid>İşlerimizden</h2>
@@ -521,7 +557,7 @@ section.pin{padding:0}
   </div>
 </section>
 
-<section id="yorumlar">
+<section data-sec="ref" id="yorumlar">
   <div class="wrap">
     <div class="kicker reveal">Google yorumları</div>
     <h2 class="reveal" data-liquid>Müşterilerimiz ne diyor</h2>
@@ -547,7 +583,7 @@ section.pin{padding:0}
   </div>
 </section>
 
-<section id="iletisim">
+<section data-sec="iletisim" id="iletisim">
   <div class="wrap">
     <div class="kicker reveal">Bize ulaşın</div>
     <h2 class="reveal" data-liquid>İletişim</h2>
@@ -707,6 +743,14 @@ section.pin{padding:0}
     'Tekirdağ Namık Kemal Üniversitesi Tıp Fakültesi dekanlar panosu, kabartma yazı ve pleksi çerçeveler': 'Deans honor board with raised lettering and acrylic frames for Tekirdağ Namık Kemal University Faculty of Medicine',
     'Salon by Güner berber dükkânının altın harfli cephe ve dikey tabelaları': 'Gold lettered facade and vertical signs for the Salon by Güner barber shop',
     'Yerinde keşif ücretsiz': 'Free on-site survey',
+    // menü
+    'Ana Sayfa': 'Home',
+    'Ürünler': 'Products',
+    'Referanslar': 'References',
+    'Ana menü': 'Main menu',
+    'Mobil menü': 'Mobile menu',
+    'Menüyü aç': 'Open menu',
+    'Menüyü kapat': 'Close menu',
     // yorumlar
     'Google yorumları': 'Google reviews',
     'Müşterilerimiz ne diyor': 'What our customers say',
@@ -1378,6 +1422,32 @@ function runIntro3D(canvas, onDone) {
   };
   requestAnimationFrame(tick);
   if (reduce) caps.forEach(c => c.classList.add('on'));
+})();
+</script>
+
+<script>
+/* ======== Üst menü: mobil açılır panel + bulunulan bölümü işaretleme ======== */
+(() => {
+  const nav = document.getElementById('nav'), btn = document.getElementById('menuBtn'), panel = document.getElementById('menuPanel');
+  const setOpen = open => {
+    btn.setAttribute('aria-expanded', open); panel.hidden = !open; nav.classList.toggle('menu-open', open);
+    btn.setAttribute('aria-label', (window.T || (s => s))(open ? 'Menüyü kapat' : 'Menüyü aç'));
+  };
+  btn.addEventListener('click', () => setOpen(panel.hidden));
+  panel.querySelectorAll('a').forEach(a => a.addEventListener('click', () => setOpen(false)));
+  addEventListener('keydown', e => { if (e.key === 'Escape' && !panel.hidden) { setOpen(false); btn.focus(); } });
+  addEventListener('resize', () => { if (innerWidth > 1060 && !panel.hidden) setOpen(false); });
+
+  const secs = [...document.querySelectorAll('section[data-sec]')];
+  const links = [...document.querySelectorAll('[data-nav]')];
+  let cur = '';
+  const mark = () => {
+    const y = innerHeight * .35; let k = secs[0].dataset.sec;
+    for (const s of secs) if (s.getBoundingClientRect().top <= y) k = s.dataset.sec;
+    if (k !== cur) { cur = k; links.forEach(a => { const on = a.dataset.nav === k; a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'location'); else a.removeAttribute('aria-current'); }); }
+  };
+  let raf = 0; addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; mark(); }); }, { passive: true });
+  addEventListener('load', mark); mark();
 })();
 </script>
 
