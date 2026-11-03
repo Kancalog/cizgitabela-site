@@ -147,6 +147,7 @@ legend{font-weight:600;font-size:13px;color:var(--muted);text-transform:uppercas
 .tab{font:700 18px var(--f-display);letter-spacing:.04em;text-transform:uppercase;background:none;border:none;color:var(--muted);padding:8px 14px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px}
 .tab[aria-selected="true"]{color:var(--brand);border-bottom-color:var(--accent)}
 .tab .c{font-family:var(--f-body);font-size:12px;font-weight:600;background:var(--surface2);border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:2px}
+@media (max-width:520px){.tabs{gap:0}.tab{font-size:15px;padding:8px 9px}.tab .c{margin-left:4px;padding:1px 5px}}
 .tab:focus-visible{outline:2px solid var(--info);outline-offset:2px}
 
 /* kaynak etiketi: renk JS'te --sc ile verilir */
@@ -202,6 +203,27 @@ legend{font-weight:600;font-size:13px;color:var(--muted);text-transform:uppercas
 .cjobs .m{color:var(--muted);font-size:12.5px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .srcedit{display:flex;flex-wrap:wrap;gap:6px}
 .srcedit .src{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:4px 8px}
+/* günlük */
+.dpanel{padding:12px 14px}
+.dpanel .panel-h h2{font-size:18px}
+.legend{display:flex;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:0}
+.dchart{display:grid;grid-template-columns:repeat(30,minmax(0,1fr));gap:3px;align-items:end;height:170px;padding-top:16px}
+.dbar{height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:stretch;background:none;border:none;padding:0;cursor:pointer;position:relative;font:inherit;color:inherit;border-radius:3px}
+.dbar .stk{display:flex;flex-direction:column-reverse;border-radius:3px 3px 0 0;overflow:hidden;min-height:2px;background:var(--line)}
+.dbar .stk i{display:block}
+.dbar .n{position:absolute;left:0;right:0;text-align:center;font:700 12px var(--f-display);font-variant-numeric:tabular-nums;color:var(--ink)}
+.dbar .dl{font-size:10.5px;color:var(--muted);text-align:center;margin-top:3px;font-variant-numeric:tabular-nums;line-height:1.1}
+.dbar.we .dl{color:var(--danger)}
+.dbar[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 28%,transparent)}
+.dbar[aria-pressed="true"] .dl{color:var(--ink);font-weight:700}
+.dbar:focus-visible{outline:2px solid var(--info);outline-offset:1px}
+@media (max-width:640px){.dchart{gap:1px;height:140px}.dbar .n{font-size:10px}.dbar .dl{font-size:8.5px}.dbar .dl b{display:none}}
+.daynav{display:flex;gap:6px;align-items:center;margin:12px 0 8px;flex-wrap:wrap}
+.daynav .inp{width:auto;flex:0 1 170px;font-size:15px;padding:6px 9px}
+.daysum{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;margin-bottom:8px;display:flex;gap:6px 18px;flex-wrap:wrap;align-items:center;font-size:14px;font-variant-numeric:tabular-nums}
+.daysum .dn{font:700 22px var(--f-display);text-transform:uppercase;letter-spacing:.02em}
+.daysum b{font-weight:700}
 .srcedit .src button{background:none;border:none;color:inherit;cursor:pointer;font-weight:700;padding:0 2px;font-size:15px;line-height:1}
 </style>
 </head>
@@ -287,7 +309,24 @@ legend{font-weight:600;font-size:13px;color:var(--muted);text-transform:uppercas
   <nav class="tabs" role="tablist" aria-label="Bölümler">
     <button class="tab" role="tab" type="button" data-tab="isler" aria-selected="true">İşler<span class="c" id="tcJobs"></span></button>
     <button class="tab" role="tab" type="button" data-tab="musteriler" aria-selected="false">Müşteriler<span class="c" id="tcCust"></span></button>
+    <button class="tab" role="tab" type="button" data-tab="gunluk" aria-selected="false">Günlük<span class="c" id="tcDay"></span></button>
   </nav>
+
+  <div id="vDay" hidden>
+    <section class="stats" id="dstats" aria-label="Günlük özet"></section>
+    <section class="panel dpanel">
+      <div class="panel-h"><h2>Son 30 gün · giren iş</h2><div class="legend" id="dlegend"></div></div>
+      <div class="dchart" id="dchart" role="group" aria-label="Günlere göre giren iş sayısı"></div>
+    </section>
+    <div class="daynav">
+      <button class="btn small" id="dPrev" type="button" aria-label="Önceki gün">‹</button>
+      <input class="inp" id="dDate" type="date" aria-label="Gün seç">
+      <button class="btn small" id="dNext" type="button" aria-label="Sonraki gün">›</button>
+      <button class="btn small" id="dToday" type="button">Bugün</button>
+    </div>
+    <div class="daysum" id="dsum"></div>
+    <div class="list" id="dlist"></div>
+  </div>
 
   <div id="vJobs">
   <section class="stats" id="stats" aria-label="Özet"></section>
@@ -382,7 +421,7 @@ const MEASURE="ÖLÇÜ ALINACAK";
 const STAGES=[MEASURE,PRICE,"TASARIM","İMALAT","MONTAJ","BİTTİ","TESLİM EDİLDİ"];
 const TR="tr-TR";
 const $=s=>document.querySelector(s);
-const state={jobs:[],customers:[],sources:[],filter:"acik",q:"",loaded:false,tab:"isler",cFilter:"tum",cq:"",period:"ay"};
+const state={jobs:[],customers:[],sources:[],filter:"acik",q:"",loaded:false,tab:"isler",cFilter:"tum",cq:"",period:"ay",day:""};
 let me=null, editingId=null, delArmed=false, baseline=null, inflight=0;
 let cEditingId=null, cDelArmed=false, cBaseline=null, cPick=null, newPick=null, newJobFor=null;
 
@@ -493,11 +532,64 @@ function render(){
   $("#tcJobs").textContent=state.jobs.filter(isOpen).length;
   $("#tcCust").textContent=state.customers.length;
   document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected",String(t.dataset.tab===state.tab)));
-  $("#vJobs").hidden=state.tab!=="isler";$("#vCust").hidden=state.tab!=="musteriler";
-  $("#addBtn").textContent=state.tab==="isler"?"+ Yeni iş":"+ Yeni müşteri";
+  $("#tcDay").textContent=state.jobs.filter(j=>jobDay(j)===isoToday()).length;
+  $("#vJobs").hidden=state.tab!=="isler";$("#vCust").hidden=state.tab!=="musteriler";$("#vDay").hidden=state.tab!=="gunluk";
+  $("#addBtn").textContent=state.tab==="musteriler"?"+ Yeni müşteri":"+ Yeni iş";
   $("#firmalar").innerHTML=state.customers.map(c=>c.ad).sort((a,b)=>a.localeCompare(b,TR)).map(f=>`<option value="${esc(f)}">`).join("");
-  if(state.tab==="isler")renderJobs();else renderCust();
+  if(state.tab==="isler")renderJobs();else if(state.tab==="musteriler")renderCust();else renderDay();
 }
+
+/* ---------- günlük ---------- */
+const addDays=(iso,n)=>{const [y,m,d]=iso.split("-").map(Number);const t=new Date(Date.UTC(y,m-1,d+n));return t.toISOString().slice(0,10)};
+const WD=["Paz","Pzt","Sal","Çar","Per","Cum","Cmt"],WD2=["Pz","Pt","Sa","Ça","Pe","Cu","Ct"];
+const wday=iso=>{const [y,m,d]=iso.split("-").map(Number);return new Date(Date.UTC(y,m-1,d)).getUTCDay()};
+function renderDay(){
+  if(!state.loaded)return;
+  const today=isoToday(), byDay=new Map();
+  for(const j of state.jobs){const d=jobDay(j);if(!d)continue;if(!byDay.has(d))byDay.set(d,[]);byDay.get(d).push(j)}
+  const cnt=d=>(byDay.get(d)||[]).length;
+  // hafta pazartesi başlar
+  const monday=addDays(today,-((wday(today)+6)%7));
+  let week=0;for(let d=monday;d<=today;d=addDays(d,1))week+=cnt(d);
+  const days=[];for(let i=29;i>=0;i--)days.push(addDays(today,-i));
+  const total30=days.reduce((s,d)=>s+cnt(d),0);
+  const ym=today.slice(0,7);const month=state.jobs.filter(j=>jobDay(j).startsWith(ym)).length;
+  $("#dstats").innerHTML=`
+    <button class="stat" type="button" data-day="${today}"><div class="n">${cnt(today)}</div><div class="l">Bugün giren</div></button>
+    <button class="stat" type="button" data-day="${addDays(today,-1)}"><div class="n">${cnt(addDays(today,-1))}</div><div class="l">Dün giren</div></button>
+    <div class="stat" style="cursor:default"><div class="n">${week}</div><div class="l">Bu hafta · bu ay ${month}</div></div>
+    <div class="stat" style="cursor:default"><div class="n">${(total30/30).toLocaleString(TR,{maximumFractionDigits:1})}</div><div class="l">Son 30 gün ort. / gün</div></div>`;
+  // grafik: kaynağa göre yığılmış çubuklar
+  const keys=[...state.sources,null];
+  const color=k=>k?srcColor(k):"var(--muted)";
+  const max=Math.max(1,...days.map(cnt));
+  $("#dchart").innerHTML=days.map(d=>{
+    const js=byDay.get(d)||[],n=js.length,we=wday(d)===0;
+    const segs=keys.map(k=>{const c=js.filter(j=>(jobSrc(j)||null)===k).length;return c?`<i style="height:${c/n*100}%;background:${color(k)}"></i>`:""}).join("");
+    const h=n?n/max*100:0;
+    return `<button type="button" class="dbar ${we?"we":""}" data-day="${d}" aria-pressed="${d===state.day}" title="${fmtDate(d)} ${WD[wday(d)]} · ${n} iş" aria-label="${fmtDate(d)}, ${n} iş">
+      <span style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;position:relative">
+        ${n?`<span class="n" style="bottom:calc(${h}% + 2px)">${n}</span>`:""}
+        <span class="stk" style="height:${n?h+"%":"2px"}">${segs}</span>
+      </span>
+      <span class="dl">${Number(d.slice(8))}<br><b>${WD2[wday(d)]}</b></span>
+    </button>`;
+  }).join("");
+  const used=keys.filter(k=>days.some(d=>(byDay.get(d)||[]).some(j=>(jobSrc(j)||null)===k)));
+  $("#dlegend").innerHTML=used.map(k=>`<span><i style="background:${color(k)}"></i>${k?esc(srcTitle(k)):"Belirsiz"}</span>`).join("");
+  // seçilen gün
+  const sel=state.day, js=sortJobs(byDay.get(sel)||[]), s=sumJobs(js);
+  $("#dDate").value=sel;$("#dNext").disabled=sel>=today;
+  const teklif=js.reduce((a,j)=>a+(num(j.satis)||0),0);
+  const bySrc=keys.map(k=>[k,js.filter(j=>(jobSrc(j)||null)===k).length]).filter(x=>x[1]);
+  const label=sel===today?"Bugün":sel===addDays(today,-1)?"Dün":fmtDate(sel)+" "+WD[wday(sel)];
+  $("#dsum").innerHTML=`<span class="dn">${label}</span><span><b>${js.length}</b> iş girdi</span>${js.length?`<span>Teklif toplamı <b>${tl(teklif)}</b></span><span>Alınan <b>${s.won}</b>${s.won?` · ${tl(s.ciro)}`:""}</span><span>${bySrc.map(([k,c])=>`${srcTag(k)} ${c}`).join(" ")}</span>`:""}`;
+  $("#dlist").innerHTML=js.length?js.map(rowHtml).join(""):`<div class="empty"><b>Bu gün iş girilmemiş</b>Sağ alttaki “+ Yeni iş” ile bu tarihe iş ekleyebilirsiniz.</div>`;
+}
+$("#dPrev").onclick=()=>{state.day=addDays(state.day,-1);render()};
+$("#dNext").onclick=()=>{if(state.day<isoToday()){state.day=addDays(state.day,1);render()}};
+$("#dToday").onclick=()=>{state.day=isoToday();render()};
+$("#dDate").addEventListener("change",e=>{if(/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)){state.day=e.target.value;render()}});
 function renderJobs(){
   const jobs=state.jobs;
   const open=jobs.filter(isOpen),late=jobs.filter(isLate);
@@ -570,7 +662,8 @@ function rowHtml(j){
 }
 
 /* ---------- müşteriler ---------- */
-const jobDay=j=>j.tarih||(j.createdAt?new Date(j.createdAt).toISOString().slice(0,10):"");
+const localDay=t=>{const d=new Date(t);return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())};
+const jobDay=j=>j.tarih||(j.createdAt?localDay(j.createdAt):"");
 function periodRange(p){
   const d=new Date(),y=d.getFullYear(),m=d.getMonth();
   const iso=(Y,M,D)=>Y+"-"+pad(M+1)+"-"+pad(D);
@@ -741,6 +834,8 @@ document.addEventListener("click",e=>{
   if(f){state.filter=f.dataset.f;try{localStorage.setItem("cizgi-filter",state.filter)}catch(_){}render();return}
   const tb=e.target.closest("[data-tab]");
   if(tb){state.tab=tb.dataset.tab;try{localStorage.setItem("cizgi-tab",state.tab)}catch(_){}render();window.scrollTo(0,0);return}
+  const dd=e.target.closest("[data-day]");
+  if(dd){state.day=dd.dataset.day;render();return}
   const cf=e.target.closest("[data-cf]");
   if(cf){state.cFilter=state.cFilter===cf.dataset.cf&&cf.dataset.cf!=="tum"?"tum":cf.dataset.cf;render();return}
   const a=e.target.closest("[data-act]");
@@ -782,9 +877,9 @@ function updCbox(){
   }
 }
 $("#f_firma").addEventListener("input",updCbox);
-function openForm(id,forCust){
+function openForm(id,forCust,forDay){
   editingId=id||null;delArmed=false;newPick=null;
-  const j=id?state.jobs.find(x=>x.id===id):{tarih:isoToday(),firma:forCust?forCust.ad:""};
+  const j=id?state.jobs.find(x=>x.id===id):{tarih:forDay||isoToday(),firma:forCust?forCust.ad:""};
   if(!j)return;
   if($("#cdlg").open)$("#cdlg").close();
   FIELDS.forEach(k=>{const el=$("#f_"+k);let v=j[k]??"";if(MONEY.includes(k)&&v!=="")v=String(num(v)).replace(".",",");el.value=v});
@@ -801,7 +896,7 @@ function updCalc(){
   $("#calc").innerHTML=`<span>Kalan: <b>${s==null?"—":tl(s-k)}</b></span><span>Kâr: <b>${s==null||m==null?"—":tl(s-m)}</b></span>${s&&m!=null?`<span>Kâr oranı: <b>%${Math.round((s-m)/s*100)}</b></span>`:""}`;
 }
 ["#f_satis","#f_maliyet","#f_kapora"].forEach(s=>$(s).addEventListener("input",updCalc));
-$("#addBtn").addEventListener("click",()=>state.tab==="musteriler"?openCust(null):openForm(null));
+$("#addBtn").addEventListener("click",()=>state.tab==="musteriler"?openCust(null):openForm(null,null,state.tab==="gunluk"?state.day:null));
 $("#cancelBtn").addEventListener("click",()=>$("#dlg").close());
 $("#form").addEventListener("submit",async e=>{
   e.preventDefault();
@@ -942,8 +1037,9 @@ $("#exportBtn").addEventListener("click",()=>{
 
 /* ---------- açılış ---------- */
 try{const f=localStorage.getItem("cizgi-filter");if(f&&FILTERS.some(x=>x.k===f))state.filter=f}catch(_){}
-try{const t=localStorage.getItem("cizgi-tab");if(t==="isler"||t==="musteriler")state.tab=t;const p=localStorage.getItem("cizgi-period");if(p&&["ay","gecenay","yil","tum"].includes(p))state.period=p}catch(_){}
+try{const t=localStorage.getItem("cizgi-tab");if(["isler","musteriler","gunluk"].includes(t))state.tab=t;const p=localStorage.getItem("cizgi-period");if(p&&["ay","gecenay","yil","tum"].includes(p))state.period=p}catch(_){}
 $("#period").value=state.period;
+state.day=isoToday();
 $("#today").textContent=new Date().toLocaleDateString(TR,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
 (async()=>{
   try{me=await api("GET","/api/me");showApp();await refresh()}
