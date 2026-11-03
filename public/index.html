@@ -63,7 +63,7 @@ h1 span{display:inline-block;background:var(--accent);color:var(--accent-ink);pa
 .banner{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:14px;margin-bottom:10px}
 .list{display:flex;flex-direction:column;gap:8px;margin-top:4px}
 .job{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:grid;grid-template-columns:minmax(0,1.6fr) 120px 150px minmax(0,1fr) auto;gap:14px;align-items:center;border-left:5px solid var(--line)}
-.job.s-ÖLÇÜ{border-left-color:var(--danger)} .job.s-FİYAT{border-left-color:var(--warn)} .job.s-TASARIM{border-left-color:var(--info)} .job.s-İMALAT{border-left-color:var(--accent)} .job.s-MONTAJ{border-left-color:#8a5cd1} .job.s-TESLİM{border-left-color:var(--ok)}
+.job.s-ÖLÇÜ{border-left-color:var(--danger)} .job.s-FİYAT{border-left-color:var(--warn)} .job.s-TASARIM{border-left-color:var(--info)} .job.s-İMALAT{border-left-color:var(--accent)} .job.s-MONTAJ{border-left-color:#8a5cd1} .job.s-BİTTİ{border-left-color:#0e8c8a} .job.s-TESLİM{border-left-color:var(--ok)}
 .job.late{border-left-color:var(--danger)}
 .job.done{opacity:.72}
 .who{min-width:0}
@@ -264,7 +264,7 @@ legend{font-weight:600;font-size:13px;color:var(--muted);text-transform:uppercas
 <script>
 const PRICE="FİYAT AŞAMASINDA";
 const MEASURE="ÖLÇÜ ALINACAK";
-const STAGES=[MEASURE,PRICE,"TASARIM","İMALAT","MONTAJ","TESLİM EDİLDİ"];
+const STAGES=[MEASURE,PRICE,"TASARIM","İMALAT","MONTAJ","BİTTİ","TESLİM EDİLDİ"];
 const TR="tr-TR";
 const $=s=>document.querySelector(s);
 const state={jobs:[],filter:"acik",q:"",loaded:false};
@@ -348,6 +348,7 @@ const FILTERS=[
   {k:"olcu",t:"Ölçü alınacaklar",f:j=>j.durum===MEASURE},
   {k:"fiyat",t:"Fiyat aşamasında",f:j=>j.durum===PRICE},
   {k:"tahsil",t:"Tahsil edilecek",f:j=>j.alindi==="EVET"&&(balance(j)||0)>0},
+  {k:"bitti",t:"Bitti",f:j=>j.durum==="BİTTİ"},
   {k:"teslim",t:"Teslim edilen",f:isDone},
   {k:"tum",t:"Tümü",f:()=>true}
 ];

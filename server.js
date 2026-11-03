@@ -110,7 +110,7 @@ function send(res, code, obj) {
 const str = (v, max) => String(v ?? '').trim().slice(0, max);
 
 /* ---------- iş alanları ---------- */
-const STAGES = ['ÖLÇÜ ALINACAK', 'FİYAT AŞAMASINDA', 'TASARIM', 'İMALAT', 'MONTAJ', 'TESLİM EDİLDİ'];
+const STAGES = ['ÖLÇÜ ALINACAK', 'FİYAT AŞAMASINDA', 'TASARIM', 'İMALAT', 'MONTAJ', 'BİTTİ', 'TESLİM EDİLDİ'];
 const YESNO = new Set(['EVET', 'HAYIR']);
 const FIELDS = ['tarih', 'fisNo', 'firma', 'tanim', 'maliyet', 'satis', 'kapora', 'termin', 'donus', 'alindi', 'durum', 'not'];
 const MONEY = new Set(['maliyet', 'satis', 'kapora']);
