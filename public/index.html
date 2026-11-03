@@ -141,6 +141,68 @@ legend{font-weight:600;font-size:13px;color:var(--muted);text-transform:uppercas
 .urow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;background:var(--surface2);border-radius:6px;padding:6px 9px}
 .urow .role{font-size:12.5px;color:var(--muted)}
 .urow .sp{flex:1}
+
+/* sekmeler */
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:12px}
+.tab{font:700 18px var(--f-display);letter-spacing:.04em;text-transform:uppercase;background:none;border:none;color:var(--muted);padding:8px 14px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px}
+.tab[aria-selected="true"]{color:var(--brand);border-bottom-color:var(--accent)}
+.tab .c{font-family:var(--f-body);font-size:12px;font-weight:600;background:var(--surface2);border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:2px}
+.tab:focus-visible{outline:2px solid var(--info);outline-offset:2px}
+
+/* kaynak etiketi: renk JS'te --sc ile verilir */
+.src{display:inline-block;font:700 12px var(--f-body);letter-spacing:.04em;border-radius:4px;padding:2px 7px;background:color-mix(in srgb,var(--sc,var(--muted)) 16%,transparent);color:var(--sc,var(--muted));white-space:nowrap}
+.src.none{--sc:var(--danger)}
+
+/* kaynak özetleri */
+.sumhead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.sumhead h2{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.03em;margin:0;font-size:20px}
+.sumhead select{font:600 14px var(--f-body);border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:6px 10px}
+.srcgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-bottom:12px}
+.scard{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--sc,var(--line));border-radius:var(--r);padding:10px 12px;text-align:left;font:inherit;color:inherit;cursor:pointer;display:grid;gap:6px}
+.scard[aria-pressed="true"]{outline:2px solid var(--sc,var(--brand));outline-offset:-1px}
+.scard .nm{font:700 20px var(--f-display);letter-spacing:.03em;text-transform:uppercase;color:var(--sc,var(--ink))}
+.scard .big{display:flex;gap:14px;font-variant-numeric:tabular-nums}
+.scard .big b{font:700 24px var(--f-display);display:block;line-height:1}
+.scard .big span{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.scard dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:1px 10px;font-size:13px;font-variant-numeric:tabular-nums}
+.scard dt{color:var(--muted)} .scard dd{margin:0;text-align:right;font-weight:600}
+@media (max-width:640px){
+  .srcgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .scard{padding:8px 9px;gap:4px}
+  .scard .nm{font-size:16px}
+  .scard .big{gap:8px}.scard .big b{font-size:19px}.scard .big span{font-size:9.5px;letter-spacing:.02em}
+  .scard dl{font-size:11.5px;grid-template-columns:auto auto;gap:0 6px}
+  .scard dd span{display:none}
+}
+
+/* müşteri satırı */
+.cust{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) auto;gap:14px;align-items:center;border-left:5px solid var(--sc,var(--line))}
+.cust .tel{color:var(--info);text-decoration:none;font-weight:600}
+.cust .nums{display:grid;grid-template-columns:repeat(4,auto);gap:1px 14px;font-size:13px;font-variant-numeric:tabular-nums;margin:0}
+.cust .nums dt{color:var(--muted);grid-row:1} .cust .nums dd{margin:0;font-weight:600;grid-row:2}
+@media (max-width:820px){.cust{grid-template-columns:minmax(0,1fr) auto}.cust .who{grid-column:1/-1}.cust .nums{grid-column:1/2}}
+
+/* iş formunda müşteri kaynağı */
+.cbox{grid-column:1/-1;background:var(--surface2);border-radius:8px;padding:9px 10px;font-size:14px;display:grid;gap:8px}
+.cbox.new{background:var(--warn-bg)}
+.cbox .t{font-weight:600}
+.cbox.new .t{color:var(--warn)}
+.picks{display:flex;gap:6px;flex-wrap:wrap}
+.pick{font:700 14px var(--f-body);border:2px solid var(--sc,var(--line));background:var(--surface);color:var(--sc,var(--ink));border-radius:999px;padding:6px 14px;cursor:pointer}
+.pick[aria-pressed="true"]{background:var(--sc,var(--brand));color:#fff}
+.pick:focus-visible{outline:2px solid var(--info);outline-offset:2px}
+.linkbtn{background:none;border:none;padding:0;color:var(--info);font:inherit;font-weight:600;cursor:pointer;text-decoration:underline}
+
+/* müşteri formundaki iş listesi */
+.cjobs{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.cjobs h3{font:700 16px var(--f-display);text-transform:uppercase;letter-spacing:.04em;margin:0 0 8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.cjobs ol{list-style:none;margin:0;padding:0;display:grid;gap:6px;max-height:240px;overflow:auto}
+.cjobs li button{width:100%;text-align:left;background:var(--surface2);border:1px solid transparent;border-radius:6px;padding:7px 9px;cursor:pointer;font:inherit;color:inherit;display:flex;justify-content:space-between;gap:10px}
+.cjobs li button:hover{border-color:var(--line)}
+.cjobs .m{color:var(--muted);font-size:12.5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.srcedit{display:flex;flex-wrap:wrap;gap:6px}
+.srcedit .src{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:4px 8px}
+.srcedit .src button{background:none;border:none;color:inherit;cursor:pointer;font-weight:700;padding:0 2px;font-size:15px;line-height:1}
 </style>
 </head>
 <body>
@@ -208,6 +270,12 @@ legend{font-weight:600;font-size:13px;color:var(--muted);text-transform:uppercas
         </div>
         <span class="msg" id="uMsg"></span>
       </fieldset>
+      <fieldset class="adm" style="grid-column:1/-1"><legend>Müşteri kaynakları</legend>
+        <span class="hint">Müşterinin kimden ya da nereden geldiği. Yeni bir ortak ya da kanal eklenirse buraya yazın. Müşterisi olan kaynak silinemez.</span>
+        <div class="srcedit" id="srcEdit"></div>
+        <div class="inl"><input class="inp" id="srcNew" placeholder="Yeni kaynak (örn. INSTAGRAM)" aria-label="Yeni kaynak"><button class="btn primary small" id="srcAdd" type="button">Ekle</button></div>
+        <span class="msg" id="srcMsg"></span>
+      </fieldset>
       <fieldset class="adm" id="importBox" hidden style="grid-column:1/-1"><legend>Eski kayıtları içe aktar</legend>
         <span class="hint">Claude'un hazırladığı aktarım dosyasını ya da bir İş Takibi yedeğini seçin. Yalnızca sistem boşken çalışır.</span>
         <div class="inl"><input type="file" id="importFile" accept=".json,application/json" aria-label="Aktarım dosyası"><button class="btn primary small" id="importBtn" type="button">İçe aktar</button></div>
@@ -216,15 +284,37 @@ legend{font-weight:600;font-size:13px;color:var(--muted);text-transform:uppercas
     </div>
   </section>
 
+  <nav class="tabs" role="tablist" aria-label="Bölümler">
+    <button class="tab" role="tab" type="button" data-tab="isler" aria-selected="true">İşler<span class="c" id="tcJobs"></span></button>
+    <button class="tab" role="tab" type="button" data-tab="musteriler" aria-selected="false">Müşteriler<span class="c" id="tcCust"></span></button>
+  </nav>
+
+  <div id="vJobs">
   <section class="stats" id="stats" aria-label="Özet"></section>
 
   <div class="toolbar">
-    <input id="q" class="search" type="search" placeholder="Firma, iş veya fiş no ara…" autocomplete="off" aria-label="Ara">
+    <input id="q" class="search" type="search" placeholder="Firma, iş, fiş no veya kaynak ara…" autocomplete="off" aria-label="Ara">
     <div class="chips" id="chips" role="group" aria-label="Filtre"></div>
   </div>
 
   <div class="list" id="list">
     <div class="empty"><b>İşler yükleniyor</b>Kayıtlı işlerin birazdan burada listelenecek.</div>
+  </div>
+  </div>
+
+  <div id="vCust" hidden>
+    <div class="sumhead">
+      <h2>Kaynağa göre</h2>
+      <select id="period" aria-label="Dönem">
+        <option value="ay">Bu ay</option><option value="gecenay">Geçen ay</option><option value="yil">Bu yıl</option><option value="tum">Tüm zamanlar</option>
+      </select>
+    </div>
+    <section class="srcgrid" id="srcSum" aria-label="Kaynak özetleri"></section>
+    <div class="toolbar">
+      <input id="cq" class="search" type="search" placeholder="Müşteri, yetkili veya telefon ara…" autocomplete="off" aria-label="Müşteri ara">
+      <div class="chips" id="cchips" role="group" aria-label="Kaynak filtresi"></div>
+    </div>
+    <div class="list" id="clist"></div>
   </div>
 </div>
 
@@ -238,6 +328,7 @@ legend{font-weight:600;font-size:13px;color:var(--muted);text-transform:uppercas
       <label>Tarih<input id="f_tarih" name="tarih" type="date"></label>
       <label>Fiş no<input id="f_fisNo" name="fisNo" inputmode="numeric"></label>
       <label class="full">Kişi / Firma *<input id="f_firma" name="firma" list="firmalar" required></label>
+      <div class="cbox" id="cbox" hidden></div>
       <label class="full">İşin tanımı *<input id="f_tanim" name="tanim" required placeholder="Örn. kutu harf tabela 400×80"></label>
       <label>İşin maliyeti (₺)<input id="f_maliyet" name="maliyet" inputmode="decimal" placeholder="0"></label>
       <label>Satış bedeli (₺)<input id="f_satis" name="satis" inputmode="decimal" placeholder="0"></label>
@@ -261,14 +352,39 @@ legend{font-weight:600;font-size:13px;color:var(--muted);text-transform:uppercas
 </dialog>
 <datalist id="firmalar"></datalist>
 
+<dialog id="cdlg">
+  <form class="sheet" id="cform" method="dialog" autocomplete="off">
+    <h2 id="cdlgTitle">Yeni müşteri</h2>
+    <div class="grid">
+      <label class="full">Kişi / Firma adı *<input id="c_ad" required></label>
+      <div class="cbox full"><span class="t">Nereden geldi? *</span><div class="picks" id="c_picks" role="radiogroup" aria-label="Müşteri kaynağı"></div></div>
+      <label class="full">Kaynak detayı<input id="c_kaynakNot" placeholder="Örn. Instagram reklamı, Google, Faruk'un komşusu…"></label>
+      <label>Yetkili kişi<input id="c_yetkili" autocomplete="off"></label>
+      <label>Telefon<input id="c_telefon" type="tel" inputmode="tel" placeholder="05xx xxx xx xx"></label>
+      <label class="full">Adres<input id="c_adres"></label>
+      <label class="full">Not<textarea id="c_not"></textarea></label>
+    </div>
+    <div class="cjobs" id="cjobs" hidden><h3><span id="cjobsT">İşleri</span><button type="button" class="btn small primary" id="cNewJob">+ Bu müşteriye iş</button></h3><ol id="cjobList"></ol></div>
+    <details class="hist" id="chist" hidden><summary>Değişiklik geçmişi</summary><ol id="chistList"></ol></details>
+    <div class="actions">
+      <div><button type="button" class="btn danger" id="cdelBtn" hidden>Sil</button></div>
+      <div class="r">
+        <button type="button" class="btn" id="ccancelBtn">Vazgeç</button>
+        <button type="submit" class="btn primary" id="csaveBtn">Kaydet</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
 <script>
 const PRICE="FİYAT AŞAMASINDA";
 const MEASURE="ÖLÇÜ ALINACAK";
 const STAGES=[MEASURE,PRICE,"TASARIM","İMALAT","MONTAJ","BİTTİ","TESLİM EDİLDİ"];
 const TR="tr-TR";
 const $=s=>document.querySelector(s);
-const state={jobs:[],filter:"acik",q:"",loaded:false};
+const state={jobs:[],customers:[],sources:[],filter:"acik",q:"",loaded:false,tab:"isler",cFilter:"tum",cq:"",period:"ay"};
 let me=null, editingId=null, delArmed=false, baseline=null, inflight=0;
+let cEditingId=null, cDelArmed=false, cBaseline=null, cPick=null, newPick=null, newJobFor=null;
 
 /* ---------- yardımcılar ---------- */
 const pad=n=>String(n).padStart(2,"0");
@@ -287,6 +403,17 @@ const isLate=j=>!isDone(j)&&j.alindi!=="HAYIR"&&j.termin&&daysUntil(j.termin)<0;
 const balance=j=>{const s=num(j.satis),k=num(j.kapora)||0;return s==null?null:s-k};
 const profit=j=>{const s=num(j.satis),m=num(j.maliyet);return s==null||m==null?null:s-m};
 const isAdmin=()=>!!me&&me.role==="admin";
+
+/* müşteri / kaynak yardımcıları */
+const NOSRC="__yok__";
+const SRC_COLORS=["#d9480f","#2a5bb8","#1d7a46","#8a5cd1","#0e8c8a","#b8860b","#c2255c","#5c6b7a"];
+const srcColor=s=>{const i=state.sources.indexOf(s);return i<0?"var(--muted)":SRC_COLORS[i%SRC_COLORS.length]};
+const srcTitle=s=>s?s.toLocaleLowerCase(TR).replace(/(^|\s)\S/g,c=>c.toLocaleUpperCase(TR)):"";
+const srcTag=s=>s?`<span class="src" style="--sc:${srcColor(s)}">${esc(srcTitle(s))}</span>`:`<span class="src none">Kaynak belirsiz</span>`;
+const custById=id=>state.customers.find(c=>c.id===id)||null;
+const custByName=n=>{const k=up(n).replace(/\s+/g," ");return k?state.customers.find(c=>c.ad===k)||null:null};
+const jobCust=j=>custById(j.musteriId)||custByName(j.firma);
+const jobSrc=j=>{const c=jobCust(j);return c?c.kaynak:null};
 
 const LABELS={tarih:"Tarih",fisNo:"Fiş no",firma:"Firma",tanim:"İşin tanımı",maliyet:"Maliyet",satis:"Satış bedeli",kapora:"Kapora/ödeme",termin:"Termin",donus:"Dönüş",alindi:"İş alındı",durum:"Durum",not:"Not"};
 const MONEY=["maliyet","satis","kapora"];
@@ -312,25 +439,27 @@ async function api(method,url,body){
   finally{inflight--}
   let j=null;try{j=await r.json()}catch(e){}
   if(r.status===401&&!/\/api\/(login|setup)$/.test(url)){showAuth();throw new Error("Oturum kapandı, tekrar giriş yapın.")}
-  if(!r.ok)throw new Error((j&&j.error)||"İşlem yapılamadı.");
+  if(!r.ok){const er=new Error((j&&j.error)||"İşlem yapılamadı.");if(j&&j.exists)er.exists=j.exists;throw er}
   return j;
 }
 async function refresh(){
   const s=await api("GET","/api/state");
-  me=s.me;state.jobs=s.jobs;state.loaded=true;
+  me=s.me;state.jobs=s.jobs;state.customers=s.customers||[];state.sources=s.sources||[];state.loaded=true;
   $("#whoami").textContent=me.name+(isAdmin()?" · yönetici":"");
   document.querySelectorAll(".adm").forEach(e=>e.hidden=!isAdmin());
-  $("#importBox").hidden=!isAdmin()||state.jobs.length>0;
+  $("#importBox").hidden=!isAdmin()||state.jobs.length>0||state.customers.length>0;
   $("#banner").hidden=true;
+  renderSrcEdit();
   render();
 }
 function replaceJob(j){const i=state.jobs.findIndex(x=>x.id===j.id);if(i>=0)state.jobs[i]=j;else state.jobs.push(j);render()}
 // Başkasının değişikliklerini görmek için arada bir yenile (açık form varken değil).
-setInterval(()=>{if(me&&state.loaded&&!document.hidden&&!$("#dlg").open&&!inflight)refresh().catch(()=>{})},20000);
-document.addEventListener("visibilitychange",()=>{if(!document.hidden&&me&&!$("#dlg").open)refresh().catch(()=>{})});
+const anyDlg=()=>$("#dlg").open||$("#cdlg").open;
+setInterval(()=>{if(me&&state.loaded&&!document.hidden&&!anyDlg()&&!inflight)refresh().catch(()=>{})},20000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&me&&!anyDlg())refresh().catch(()=>{})});
 
 /* ---------- giriş ---------- */
-function showAuth(){me=null;$("#app").hidden=true;$("#auth").hidden=false;if($("#dlg").open)$("#dlg").close();
+function showAuth(){me=null;$("#app").hidden=true;$("#auth").hidden=false;if($("#dlg").open)$("#dlg").close();if($("#cdlg").open)$("#cdlg").close();
   api("GET","/api/setup-needed").then(r=>{$("#setupForm").hidden=!r.needed;$("#loginForm").hidden=r.needed;(r.needed?$("#sc"):$("#lu")).focus()}).catch(()=>{})}
 function showApp(){$("#auth").hidden=true;$("#app").hidden=false}
 $("#loginForm").onsubmit=async e=>{e.preventDefault();$("#lErr").textContent="";
@@ -361,6 +490,15 @@ function sortJobs(a){
   });
 }
 function render(){
+  $("#tcJobs").textContent=state.jobs.filter(isOpen).length;
+  $("#tcCust").textContent=state.customers.length;
+  document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected",String(t.dataset.tab===state.tab)));
+  $("#vJobs").hidden=state.tab!=="isler";$("#vCust").hidden=state.tab!=="musteriler";
+  $("#addBtn").textContent=state.tab==="isler"?"+ Yeni iş":"+ Yeni müşteri";
+  $("#firmalar").innerHTML=state.customers.map(c=>c.ad).sort((a,b)=>a.localeCompare(b,TR)).map(f=>`<option value="${esc(f)}">`).join("");
+  if(state.tab==="isler")renderJobs();else renderCust();
+}
+function renderJobs(){
   const jobs=state.jobs;
   const open=jobs.filter(isOpen),late=jobs.filter(isLate);
   const soon=open.filter(j=>{const d=daysUntil(j.termin);return d!=null&&d>=0&&d<=3});
@@ -372,11 +510,10 @@ function render(){
     <button class="stat" data-f="acik" type="button"><div class="n">${waiting.length}</div><div class="l">Dönüş bekleyen</div></button>
     <button class="stat money" data-f="tahsil" type="button"><div class="n">${tl(due)}</div><div class="l">Tahsil edilecek</div></button>`;
   $("#chips").innerHTML=FILTERS.map(F=>`<button type="button" class="chip" data-f="${F.k}" aria-pressed="${state.filter===F.k}">${F.t}<span class="c">${jobs.filter(F.f).length}</span></button>`).join("");
-  $("#firmalar").innerHTML=[...new Set(jobs.map(j=>up(j.firma)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,TR)).map(f=>`<option value="${esc(f)}">`).join("");
   const F=FILTERS.find(x=>x.k===state.filter);
   const q=up(state.q);
   let rows=jobs.filter(F.f);
-  if(q)rows=rows.filter(j=>[j.firma,j.tanim,j.fisNo,j.not].some(v=>up(v).includes(q)));
+  if(q)rows=rows.filter(j=>[j.firma,j.tanim,j.fisNo,j.not,jobSrc(j)].some(v=>up(v).includes(q)));
   rows=sortJobs(rows);
   const L=$("#list");
   if(!state.loaded)return;
@@ -399,7 +536,8 @@ function rowHtml(j){
   else{dueCls=d<=3?"soon":"";rel=`${d} gün kaldı`}
   const bal=balance(j), pr=profit(j);
   const stageKey=(j.durum||"").split(" ")[0];
-  const flags=[];
+  const jc=jobCust(j);
+  const flags=[jc?`<button type="button" class="tag" style="padding:0;background:none" data-act="cust" data-id="${jc.id}" title="Müşteri kartını aç">${srcTag(jc.kaynak)}</button>`:srcTag(null)];
   if(j.alindi==="EVET")flags.push(`<span class="tag ok">İş alındı</span>`);
   else if(j.alindi==="HAYIR")flags.push(`<span class="tag bad">İş alınmadı</span>`);
   else flags.push(`<span class="tag warn">Teklif aşamasında</span>`);
@@ -431,6 +569,164 @@ function rowHtml(j){
   </article>`;
 }
 
+/* ---------- müşteriler ---------- */
+const jobDay=j=>j.tarih||(j.createdAt?new Date(j.createdAt).toISOString().slice(0,10):"");
+function periodRange(p){
+  const d=new Date(),y=d.getFullYear(),m=d.getMonth();
+  const iso=(Y,M,D)=>Y+"-"+pad(M+1)+"-"+pad(D);
+  if(p==="ay")return [iso(y,m,1),iso(y,m,31)];
+  if(p==="gecenay"){const pm=m===0?11:m-1,py=m===0?y-1:y;return [iso(py,pm,1),iso(py,pm,31)]}
+  if(p==="yil")return [y+"-01-01",y+"-12-31"];
+  return ["0000","9999"];
+}
+const inRange=(day,[a,b])=>!!day&&day>=a&&day<=b;
+// Bir iş listesinin özeti: teklif, alınan, ciro, kâr, tahsil edilecek
+function sumJobs(js){
+  const won=js.filter(j=>j.alindi==="EVET"),decided=js.filter(j=>j.alindi==="EVET"||j.alindi==="HAYIR");
+  return {n:js.length,won:won.length,decided:decided.length,
+    ciro:won.reduce((s,j)=>s+(num(j.satis)||0),0),
+    kar:won.reduce((s,j)=>s+(profit(j)||0),0),
+    kalan:won.reduce((s,j)=>s+Math.max(0,balance(j)||0),0)};
+}
+function custJobs(c){return state.jobs.filter(j=>j.musteriId===c.id||(!j.musteriId&&up(j.firma)===c.ad))}
+function renderCust(){
+  if(!state.loaded)return;
+  const rng=periodRange(state.period);
+  const keys=[...state.sources];
+  if(state.customers.some(c=>!c.kaynak))keys.push(NOSRC);
+  const pJobs=state.jobs.filter(j=>inRange(jobDay(j),rng));
+  const totalCiro=sumJobs(pJobs).ciro;
+  $("#srcSum").innerHTML=keys.map(k=>{
+    const src=k===NOSRC?null:k;
+    const js=pJobs.filter(j=>(jobSrc(j)||null)===src);
+    const nc=state.customers.filter(c=>(c.kaynak||null)===src&&inRange(c.createdAt?new Date(c.createdAt).toISOString().slice(0,10):"",rng)).length;
+    const s=sumJobs(js);
+    const conv=s.decided?Math.round(s.won/s.decided*100):null;
+    const share=totalCiro?Math.round(s.ciro/totalCiro*100):0;
+    return `<button type="button" class="scard" data-cf="${esc(k)}" aria-pressed="${state.cFilter===k}" style="--sc:${src?srcColor(src):"var(--danger)"}">
+      <div class="nm">${src?esc(srcTitle(src)):"Kaynak belirsiz"}</div>
+      <div class="big"><div><b>${nc}</b><span>Yeni müşteri</span></div><div><b>${s.n}</b><span>İş / teklif</span></div><div><b>${s.won}</b><span>Alınan</span></div></div>
+      <dl><dt>Alınma oranı</dt><dd>${conv==null?"—":"%"+conv+` <span style="color:var(--muted);font-weight:400">(${s.won}/${s.decided})</span>`}</dd>
+      <dt>Ciro</dt><dd>${tl(s.ciro)}${share?` <span style="color:var(--muted);font-weight:400">· %${share}</span>`:""}</dd>
+      <dt>Kâr</dt><dd>${tl(s.kar)}</dd>
+      <dt>Tahsil edilecek</dt><dd style="color:${s.kalan>0?"var(--danger)":"inherit"}">${tl(s.kalan)}</dd></dl>
+    </button>`;
+  }).join("");
+  const cnt=k=>state.customers.filter(c=>k==="tum"||(k===NOSRC?!c.kaynak:c.kaynak===k)).length;
+  $("#cchips").innerHTML=["tum",...keys].map(k=>`<button type="button" class="chip" data-cf="${esc(k)}" aria-pressed="${state.cFilter===k}">${k==="tum"?"Tümü":k===NOSRC?"Kaynak belirsiz":esc(srcTitle(k))}<span class="c">${cnt(k)}</span></button>`).join("");
+  const q=up(state.cq);
+  let rows=state.customers.filter(c=>state.cFilter==="tum"||(state.cFilter===NOSRC?!c.kaynak:c.kaynak===state.cFilter));
+  if(q)rows=rows.filter(c=>[c.ad,c.yetkili,c.telefon,c.kaynakNot,c.adres,c.not].some(v=>up(v).includes(q))||(c.telefon&&q.replace(/\D/g,"")&&String(c.telefon).replace(/\D/g,"").includes(q.replace(/\D/g,""))));
+  const info=new Map(rows.map(c=>{const js=custJobs(c);return [c.id,{js,s:sumJobs(js),last:Math.max(c.updatedAt||0,...js.map(j=>j.updatedAt||0))}]}));
+  rows.sort((a,b)=>info.get(b.id).last-info.get(a.id).last);
+  const L=$("#clist");
+  if(!rows.length){
+    L.innerHTML=state.customers.length?`<div class="empty"><b>Bu filtrede müşteri yok</b>${q?"Aramayı temizleyin ya da ":""}başka bir kaynak seçin.</div>`
+      :`<div class="empty"><b>Henüz müşteri yok</b>Sağ alttaki “+ Yeni müşteri” ile ekleyin. Yeni iş girerken yazdığınız firma da otomatik müşteri olur.</div>`;
+    return;
+  }
+  L.innerHTML=rows.map(c=>{
+    const {s}=info.get(c.id);
+    return `<article class="cust" style="--sc:${c.kaynak?srcColor(c.kaynak):"var(--danger)"}">
+      <div class="who">
+        <div class="firm">${esc(c.ad)}</div>
+        <div class="meta">${c.yetkili?`<span>${esc(c.yetkili)}</span>`:""}${c.telefon?`<a class="tel" href="tel:${esc(String(c.telefon).replace(/[^\d+]/g,""))}">${esc(c.telefon)}</a>`:""}${c.adres?`<span>${esc(c.adres)}</span>`:""}</div>
+        <div class="flags">${srcTag(c.kaynak)}${c.kaynakNot?`<span class="tag">${esc(c.kaynakNot)}</span>`:""}</div>
+      </div>
+      <dl class="nums"><dt>İş</dt><dd>${s.n}</dd><dt>Alınan</dt><dd>${s.won}</dd><dt>Ciro</dt><dd>${tl(s.ciro)}</dd><dt>Kalan</dt><dd style="color:${s.kalan>0?"var(--danger)":"inherit"}">${tl(s.kalan)}</dd></dl>
+      <button type="button" class="edit" data-act="cust" data-id="${c.id}">Aç</button>
+    </article>`;
+  }).join("");
+}
+$("#cq").addEventListener("input",e=>{state.cq=e.target.value;render()});
+$("#period").addEventListener("change",e=>{state.period=e.target.value;try{localStorage.setItem("cizgi-period",state.period)}catch(_){}render()});
+
+/* müşteri kartı */
+const CF=["ad","yetkili","telefon","adres","kaynak","kaynakNot","not"];
+const CLABELS={ad:"Ad",yetkili:"Yetkili",telefon:"Telefon",adres:"Adres",kaynak:"Kaynak",kaynakNot:"Kaynak detayı",not:"Not"};
+function renderCPicks(){$("#c_picks").innerHTML=picksHtml(cPick,"cpick")}
+function openCust(id){
+  cEditingId=id||null;cDelArmed=false;
+  const c=id?custById(id):{};
+  if(id&&!c)return;
+  if($("#dlg").open)$("#dlg").close();
+  ["ad","yetkili","telefon","adres","kaynakNot","not"].forEach(k=>$("#c_"+k).value=c[k]||"");
+  cPick=c.kaynak||(state.cFilter!=="tum"&&state.cFilter!==NOSRC&&!id?state.cFilter:null);
+  renderCPicks();
+  cBaseline=id?{...c}:null;
+  $("#cdlgTitle").textContent=id?"Müşteri kartı":"Yeni müşteri";
+  $("#cdelBtn").hidden=!id||!isAdmin();$("#cdelBtn").textContent="Sil";
+  $("#chist").hidden=true;$("#chist").open=false;$("#chistList").innerHTML="";
+  const cj=$("#cjobs");cj.hidden=!id;
+  if(id){
+    const js=sortJobs(custJobs(c)),s=sumJobs(js);
+    $("#cjobsT").textContent=js.length?`İşleri (${js.length}) · ciro ${tl(s.ciro)}`:"Henüz işi yok";
+    $("#cjobList").innerHTML=js.map(j=>`<li><button type="button" data-act="edit" data-id="${j.id}"><span>${esc(j.tanim)}</span><span class="m">${j.tarih?fmtDate(j.tarih)+" · ":""}${esc(j.durum||"—")} · ${tl(num(j.satis))}</span></button></li>`).join("");
+    api("GET","/api/customers/"+id+"/log").then(log=>{if(cEditingId!==id)return;$("#chist").hidden=!log.length;$("#chistList").innerHTML=cHistHtml(log)}).catch(()=>{});
+  }
+  $("#cdlg").showModal();
+  if(!id)setTimeout(()=>$("#c_ad").focus(),50);
+}
+function cHistHtml(log){
+  return log.map(e=>`<li><span class="hw">${fmtStamp(e.t)} · ${esc(who(e.user))}</span>${(e.changes||[]).map(c=>
+    c.f==="_new"?"Müşteriyi oluşturdu":c.f==="_del"?"Müşteriyi sildi":c.f==="_merge"?`<b>${esc(c.n)}</b> kaydı bu müşteriyle birleştirildi`:c.f==="_merged"?`<b>${esc(c.n)}</b> kaydıyla birleştirildi`
+    :`${esc(CLABELS[c.f]||c.f)}: <s>${esc(c.o==null?"boş":c.f==="kaynak"?srcTitle(c.o):c.o)}</s> → <b>${esc(c.n==null?"boş":c.f==="kaynak"?srcTitle(c.n):c.n)}</b>`).join("<br>")}</li>`).join("");
+}
+$("#ccancelBtn").addEventListener("click",()=>$("#cdlg").close());
+$("#cNewJob").addEventListener("click",()=>{const c=custById(cEditingId);if(c)openForm(null,c)});
+$("#cform").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const body={};
+  ["ad","yetkili","telefon","adres","kaynakNot","not"].forEach(k=>{const v=$("#c_"+k).value.trim();body[k]=v===""?null:v});
+  body.ad=up(body.ad).replace(/\s+/g," ")||null;
+  body.kaynak=cPick;
+  if(!body.ad){toast("Müşteri adı gerekli");return}
+  if(!body.kaynak&&!(cBaseline&&!cBaseline.kaynak)){toast("Müşterinin nereden geldiğini seçin");return}
+  $("#csaveBtn").disabled=true;
+  try{
+    if(cEditingId){
+      const out={};
+      CF.forEach(k=>{if((cBaseline[k]??null)!==(body[k]??null))out[k]=body[k]});
+      if(Object.keys(out).length){
+        try{await api("PATCH","/api/customers/"+cEditingId,out)}
+        catch(err){
+          if(err.exists){
+            // Aynı adla başka kayıt var: birleştirmeyi öner
+            if(confirm(`"${body.ad}" adıyla zaten bir müşteri var.\n\nİki kaydı birleştireyim mi? Bu kaydın işleri o müşteriye taşınır, bu kayıt kaldırılır.`)){
+              const r=await api("POST","/api/customers/"+cEditingId+"/merge",{into:err.exists});
+              $("#cdlg").close();await refresh();toast(`Birleştirildi · ${r.moved} iş taşındı`);return;
+            }
+            return;
+          }
+          throw err;
+        }
+      }
+      $("#cdlg").close();await refresh();toast("Müşteri güncellendi");
+    }else{
+      await api("POST","/api/customers",body);
+      $("#cdlg").close();await refresh();toast("Müşteri eklendi");
+    }
+  }
+  catch(err){toast(err.message)}
+  finally{$("#csaveBtn").disabled=false}
+});
+$("#cdelBtn").addEventListener("click",async()=>{
+  if(!cDelArmed){cDelArmed=true;$("#cdelBtn").textContent="Emin misiniz? Tekrar dokunun";return}
+  try{await api("DELETE","/api/customers/"+cEditingId);$("#cdlg").close();await refresh();toast("Müşteri silindi")}
+  catch(e){toast(e.message)}
+});
+
+/* kaynak listesi (Ayarlar) */
+function renderSrcEdit(){
+  const used=new Set(state.customers.map(c=>c.kaynak).filter(Boolean));
+  $("#srcEdit").innerHTML=state.sources.map(s=>`<span class="src" style="--sc:${srcColor(s)}">${esc(srcTitle(s))}${used.has(s)?"":`<button type="button" data-act="srcdel" data-s="${esc(s)}" aria-label="${esc(srcTitle(s))} kaynağını kaldır">×</button>`}</span>`).join("");
+}
+async function saveSources(list){
+  try{const r=await api("PUT","/api/sources",{sources:list});state.sources=r.sources;$("#srcMsg").textContent="Kaydedildi.";renderSrcEdit();render()}
+  catch(e){$("#srcMsg").textContent=e.message}
+}
+$("#srcAdd").onclick=()=>{const v=up($("#srcNew").value);if(!v)return;if(state.sources.includes(v)){$("#srcMsg").textContent="Bu kaynak zaten var.";return}$("#srcNew").value="";saveSources([...state.sources,v])};
+
 /* ---------- etkileşim ---------- */
 /* Sadece değişen alanlar gönderilir: iki kişi aynı işi düzenlerse birbirinin değişikliğini ezmez. */
 async function patch(id,newVals,base){
@@ -443,10 +739,18 @@ async function patch(id,newVals,base){
 document.addEventListener("click",e=>{
   const f=e.target.closest("[data-f]");
   if(f){state.filter=f.dataset.f;try{localStorage.setItem("cizgi-filter",state.filter)}catch(_){}render();return}
+  const tb=e.target.closest("[data-tab]");
+  if(tb){state.tab=tb.dataset.tab;try{localStorage.setItem("cizgi-tab",state.tab)}catch(_){}render();window.scrollTo(0,0);return}
+  const cf=e.target.closest("[data-cf]");
+  if(cf){state.cFilter=state.cFilter===cf.dataset.cf&&cf.dataset.cf!=="tum"?"tum":cf.dataset.cf;render();return}
   const a=e.target.closest("[data-act]");
   if(!a)return;
   const id=a.dataset.id;
   if(a.dataset.act==="edit")openForm(id);
+  if(a.dataset.act==="cust")openCust(id);
+  if(a.dataset.act==="pick"){newPick=newPick===a.dataset.s?null:a.dataset.s;updCbox();return}
+  if(a.dataset.act==="cpick"){cPick=a.dataset.s;renderCPicks();return}
+  if(a.dataset.act==="srcdel"){saveSources(state.sources.filter(s=>s!==a.dataset.s));return}
   if(a.dataset.act==="donus"){const j=state.jobs.find(x=>x.id===id);if(j)patch(id,{donus:j.donus==="EVET"?"HAYIR":"EVET"})}
 });
 document.addEventListener("change",async e=>{
@@ -464,25 +768,40 @@ $("#f_durum").innerHTML=`<option value="">—</option>`+STAGES.map(s=>`<option>$
 function histHtml(log){
   return log.map(e=>`<li><span class="hw">${fmtStamp(e.t)} · ${esc(who(e.user))}</span>${(e.changes||[]).map(c=>c.f==="_new"?"İşi oluşturdu":c.f==="_del"?"İşi sildi":`${esc(LABELS[c.f]||c.f)}: <s>${esc(fmtVal(c.f,c.o))}</s> → <b>${esc(fmtVal(c.f,c.n))}</b>`).join("<br>")}</li>`).join("");
 }
-function openForm(id){
-  editingId=id||null;delArmed=false;
-  const j=id?state.jobs.find(x=>x.id===id):{tarih:isoToday()};
+/* İş formundaki müşteri kutusu: firma adı kayıtlı müşteriyse kaynağını gösterir, değilse kaynak seçtirir. */
+const picksHtml=(sel,act)=>state.sources.map(s=>`<button type="button" class="pick" role="radio" style="--sc:${srcColor(s)}" data-act="${act}" data-s="${esc(s)}" aria-pressed="${s===sel}" aria-checked="${s===sel}">${esc(srcTitle(s))}</button>`).join("");
+function updCbox(){
+  const box=$("#cbox"),name=$("#f_firma").value.trim();
+  if(!name){box.hidden=true;return}
+  const c=custByName(name);
+  box.hidden=false;box.classList.toggle("new",!c||!c.kaynak);
+  if(c&&c.kaynak){
+    box.innerHTML=`<span><span class="t">Kayıtlı müşteri</span> · ${srcTag(c.kaynak)}${c.telefon?` · ${esc(c.telefon)}`:""} · <button type="button" class="linkbtn" data-act="cust" data-id="${c.id}">Müşteri kartı</button></span>`;
+  }else{
+    box.innerHTML=`<span class="t">${c?"Bu müşterinin kaynağı belirsiz. Nereden geldi?":"Yeni müşteri. Nereden geldi? *"}</span><div class="picks" role="radiogroup" aria-label="Müşteri kaynağı">${picksHtml(newPick,"pick")}</div>`;
+  }
+}
+$("#f_firma").addEventListener("input",updCbox);
+function openForm(id,forCust){
+  editingId=id||null;delArmed=false;newPick=null;
+  const j=id?state.jobs.find(x=>x.id===id):{tarih:isoToday(),firma:forCust?forCust.ad:""};
   if(!j)return;
+  if($("#cdlg").open)$("#cdlg").close();
   FIELDS.forEach(k=>{const el=$("#f_"+k);let v=j[k]??"";if(MONEY.includes(k)&&v!=="")v=String(num(v)).replace(".",",");el.value=v});
   baseline=id?{...j}:null;
   $("#dlgTitle").textContent=id?"İşi düzenle":"Yeni iş";
   $("#delBtn").hidden=!id||!isAdmin();$("#delBtn").textContent="Sil";
   $("#hist").hidden=true;$("#hist").open=false;$("#histList").innerHTML="";
   if(id)api("GET","/api/jobs/"+id+"/log").then(log=>{if(editingId!==id)return;$("#hist").hidden=!log.length;$("#histList").innerHTML=histHtml(log)}).catch(()=>{});
-  updCalc();$("#dlg").showModal();
-  if(!id)setTimeout(()=>$("#f_firma").focus(),50);
+  updCalc();updCbox();$("#dlg").showModal();
+  if(!id)setTimeout(()=>(forCust?$("#f_tanim"):$("#f_firma")).focus(),50);
 }
 function updCalc(){
   const s=num($("#f_satis").value),m=num($("#f_maliyet").value),k=num($("#f_kapora").value)||0;
   $("#calc").innerHTML=`<span>Kalan: <b>${s==null?"—":tl(s-k)}</b></span><span>Kâr: <b>${s==null||m==null?"—":tl(s-m)}</b></span>${s&&m!=null?`<span>Kâr oranı: <b>%${Math.round((s-m)/s*100)}</b></span>`:""}`;
 }
 ["#f_satis","#f_maliyet","#f_kapora"].forEach(s=>$(s).addEventListener("input",updCalc));
-$("#addBtn").addEventListener("click",()=>openForm(null));
+$("#addBtn").addEventListener("click",()=>state.tab==="musteriler"?openCust(null):openForm(null));
 $("#cancelBtn").addEventListener("click",()=>$("#dlg").close());
 $("#form").addEventListener("submit",async e=>{
   e.preventDefault();
@@ -494,14 +813,23 @@ $("#form").addEventListener("submit",async e=>{
     body[k]=v===""?null:v;
   }
   if(!body.firma||!body.tanim){toast("Firma ve iş tanımı gerekli");return}
+  const cust=custByName(body.firma);
+  const firmaChanged=!editingId||up(baseline&&baseline.firma)!==body.firma;
+  if(!cust&&firmaChanged&&!newPick){toast("Yeni müşteri: nereden geldiğini seçin");$("#cbox").scrollIntoView({block:"nearest"});return}
   $("#saveBtn").disabled=true;
   try{
+    // kaynağı belirsiz kayıtlı müşteri için seçilen kaynak müşteri kartına yazılır
+    if(cust&&!cust.kaynak&&newPick)await api("PATCH","/api/customers/"+cust.id,{kaynak:newPick});
     if(editingId){
-      if(await patch(editingId,body,baseline)){$("#dlg").close();toast("Güncellendi")}
+      const extra=!cust&&firmaChanged?{yeniKaynak:newPick}:{};
+      const out={...diff(baseline,body),...(Object.keys(diff(baseline,body)).length?extra:{})};
+      if(Object.keys(out).length){replaceJob(await api("PATCH","/api/jobs/"+editingId,out))}
+      $("#dlg").close();toast("Güncellendi");
     }else{
-      replaceJob(await api("POST","/api/jobs",body));
-      $("#dlg").close();toast("İş eklendi");
+      replaceJob(await api("POST","/api/jobs",{...body,yeniKaynak:cust?null:newPick}));
+      $("#dlg").close();toast(cust?"İş eklendi":"İş ve yeni müşteri eklendi");
     }
+    if(!cust||firmaChanged||newPick)refresh().catch(()=>{});
   }
   catch(err){toast(err.message)}
   finally{$("#saveBtn").disabled=false}
@@ -539,7 +867,7 @@ $("#users").onclick=async e=>{
 $("#importBtn").onclick=async()=>{
   const f=$("#importFile").files[0];if(!f){$("#importMsg").textContent="Önce dosyayı seçin.";return}
   $("#importMsg").textContent="Aktarılıyor…";
-  try{const d=JSON.parse(await f.text());const r=await api("POST","/api/import",d);$("#importMsg").textContent=`${r.jobs} iş ve ${r.log} geçmiş kaydı aktarıldı.`;await refresh()}
+  try{const d=JSON.parse(await f.text());const r=await api("POST","/api/import",d);$("#importMsg").textContent=`${r.jobs} iş, ${r.customers} müşteri ve ${r.log} geçmiş kaydı aktarıldı.`;await refresh()}
   catch(e){$("#importMsg").textContent=e instanceof SyntaxError?"Dosya okunamadı.":e.message}
 };
 
@@ -597,20 +925,25 @@ function zipStore(entries){
   const all=[...parts,...central,end];const out=new Uint8Array(all.reduce((s,p)=>s+p.length,0));let p=0;for(const a of all){out.set(a,p);p+=a.length}
   return out;
 }
-const EXPORT_COLS=[{h:"TARİH",type:"date",w:12},{h:"KİŞİ/FİRMA",w:26},{h:"İŞİN TANIMI",w:34},{h:"FİŞ NO",w:10},{h:"İŞİN MALİYETİ",type:"money",w:15},{h:"İŞİN SATIŞ BEDELİ",type:"money",w:17},{h:"KAPORA/ÖDEME",type:"money",w:15},{h:"KALAN",type:"money",w:15},{h:"KÂR",type:"money",w:15},{h:"DÖNÜŞ YAPILDI/YAPILMADI",w:14},{h:"İŞ ALINDI /ALINMADI",w:14},{h:"TERMİN TARİHİ",type:"date",w:13},{h:"İŞİN SON DURUMU",w:16},{h:"NOT",w:32}];
-const exportRows=()=>sortJobs(state.jobs).map(j=>[j.tarih||"",up(j.firma),j.tanim||"",j.fisNo||"",num(j.maliyet),num(j.satis),num(j.kapora),balance(j),profit(j),j.donus||"",j.alindi||"",j.termin||"",j.durum||"",j.not||""]);
+const EXPORT_COLS=[{h:"TARİH",type:"date",w:12},{h:"KİŞİ/FİRMA",w:26},{h:"İŞİN TANIMI",w:34},{h:"FİŞ NO",w:10},{h:"İŞİN MALİYETİ",type:"money",w:15},{h:"İŞİN SATIŞ BEDELİ",type:"money",w:17},{h:"KAPORA/ÖDEME",type:"money",w:15},{h:"KALAN",type:"money",w:15},{h:"KÂR",type:"money",w:15},{h:"DÖNÜŞ YAPILDI/YAPILMADI",w:14},{h:"İŞ ALINDI /ALINMADI",w:14},{h:"TERMİN TARİHİ",type:"date",w:13},{h:"İŞİN SON DURUMU",w:16},{h:"NOT",w:32},{h:"MÜŞTERİ KAYNAĞI",w:16}];
+const exportRows=()=>sortJobs(state.jobs).map(j=>[j.tarih||"",up(j.firma),j.tanim||"",j.fisNo||"",num(j.maliyet),num(j.satis),num(j.kapora),balance(j),profit(j),j.donus||"",j.alindi||"",j.termin||"",j.durum||"",j.not||"",jobSrc(j)||"BELİRSİZ"]);
+const CUST_COLS=[{h:"KİŞİ/FİRMA",w:28},{h:"KAYNAK",w:14},{h:"KAYNAK DETAYI",w:22},{h:"YETKİLİ",w:18},{h:"TELEFON",w:16},{h:"ADRES",w:30},{h:"İŞ SAYISI",w:10},{h:"ALINAN İŞ",w:10},{h:"CİRO",type:"money",w:15},{h:"KÂR",type:"money",w:15},{h:"TAHSİL EDİLECEK",type:"money",w:16},{h:"KAYIT TARİHİ",type:"date",w:13},{h:"NOT",w:30}];
+const custRows=()=>state.customers.slice().sort((a,b)=>a.ad.localeCompare(b.ad,TR)).map(c=>{const s=sumJobs(custJobs(c));return [c.ad,c.kaynak||"BELİRSİZ",c.kaynakNot||"",c.yetkili||"",c.telefon||"",c.adres||"",String(s.n),String(s.won),s.ciro,s.kar,s.kalan,c.createdAt?new Date(c.createdAt).toISOString().slice(0,10):"",c.not||""]});
 $("#exportBtn").addEventListener("click",()=>{
-  if(!state.jobs.length){toast("Aktarılacak iş yok");return}
+  const cust=state.tab==="musteriler";
+  if(cust?!state.customers.length:!state.jobs.length){toast(cust?"Aktarılacak müşteri yok":"Aktarılacak iş yok");return}
   let bytes;
-  try{bytes=buildXlsx(EXPORT_COLS,exportRows(),"Sayfa1")}catch(e){toast("Excel dosyası oluşturulamadı");return}
+  try{bytes=cust?buildXlsx(CUST_COLS,custRows(),"Müşteriler"):buildXlsx(EXPORT_COLS,exportRows(),"Sayfa1")}catch(e){toast("Excel dosyası oluşturulamadı");return}
   const url=URL.createObjectURL(new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
-  const a=document.createElement("a");a.href=url;a.download=`is-takip-${isoToday()}.xlsx`;document.body.appendChild(a);a.click();a.remove();
+  const a=document.createElement("a");a.href=url;a.download=`${cust?"musteriler":"is-takip"}-${isoToday()}.xlsx`;document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),10000);
   toast("Excel dosyası indiriliyor");
 });
 
 /* ---------- açılış ---------- */
 try{const f=localStorage.getItem("cizgi-filter");if(f&&FILTERS.some(x=>x.k===f))state.filter=f}catch(_){}
+try{const t=localStorage.getItem("cizgi-tab");if(t==="isler"||t==="musteriler")state.tab=t;const p=localStorage.getItem("cizgi-period");if(p&&["ay","gecenay","yil","tum"].includes(p))state.period=p}catch(_){}
+$("#period").value=state.period;
 $("#today").textContent=new Date().toLocaleDateString(TR,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
 (async()=>{
   try{me=await api("GET","/api/me");showApp();await refresh()}

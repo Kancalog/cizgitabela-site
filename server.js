@@ -24,6 +24,11 @@ CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, data TEXT NOT NULL, created
 CREATE TABLE IF NOT EXISTS joblog(id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL, t INTEGER NOT NULL, user TEXT NOT NULL DEFAULT '', changes TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS joblog_job ON joblog(job_id, t);
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS customers(id TEXT PRIMARY KEY, name_key TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL, created_by TEXT NOT NULL DEFAULT '',
+  updated_at INTEGER NOT NULL, updated_by TEXT NOT NULL DEFAULT '', deleted_at INTEGER);
+CREATE UNIQUE INDEX IF NOT EXISTS customers_name ON customers(name_key) WHERE deleted_at IS NULL;
+CREATE TABLE IF NOT EXISTS custlog(id INTEGER PRIMARY KEY AUTOINCREMENT, cust_id TEXT NOT NULL, t INTEGER NOT NULL, user TEXT NOT NULL DEFAULT '', changes TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS custlog_cust ON custlog(cust_id, t);
 `);
 
 /* ---------- veritabanı yardımcıları ---------- */
@@ -141,12 +146,140 @@ function logChange(jobId, t, user, changes) {
   run('INSERT INTO joblog(job_id,t,user,changes) VALUES(?,?,?,?)', jobId, t, user, JSON.stringify(changes));
 }
 
+/* ---------- müşteriler ---------- */
+// Kaynak: müşterinin kimden/nereden geldiği. Liste Ayarlar'dan yönetilir.
+const DEFAULT_SOURCES = ['FARUK', 'ENVER', 'DÜKKAN', 'İNTERNET'];
+const CFIELDS = ['ad', 'yetkili', 'telefon', 'adres', 'kaynak', 'kaynakNot', 'not'];
+const nameKey = s => String(s ?? '').trim().replace(/\s+/g, ' ').toLocaleUpperCase('tr');
+function getSources() {
+  const r = get("SELECT value FROM settings WHERE key='sources'");
+  try { const a = r && JSON.parse(r.value); if (Array.isArray(a) && a.length) return a; } catch (_) {}
+  return DEFAULT_SOURCES.slice();
+}
+function cleanSource(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const s = nameKey(str(v, 40));
+  if (!getSources().includes(s)) fail(400, 'Geçersiz müşteri kaynağı.');
+  return s;
+}
+function cleanC(k, v) {
+  if (v === undefined || v === null || v === '') return null;
+  if (k === 'ad') return nameKey(str(v, 120)) || null;
+  if (k === 'kaynak') return cleanSource(v);
+  if (k === 'telefon') return str(v, 30) || null;
+  if (k === 'yetkili' || k === 'kaynakNot') return str(v, 80) || null;
+  if (k === 'adres') return str(v, 300) || null;
+  if (k === 'not') return str(v, 1000) || null;
+  return null;
+}
+function custRow(r) {
+  return { id: r.id, ...JSON.parse(r.data), createdAt: r.created_at, createdBy: r.created_by, updatedAt: r.updated_at, updatedBy: r.updated_by };
+}
+function custLog(id, t, user, changes) {
+  run('INSERT INTO custlog(cust_id,t,user,changes) VALUES(?,?,?,?)', id, t, user, JSON.stringify(changes));
+}
+const custByName = name => get('SELECT * FROM customers WHERE name_key=? AND deleted_at IS NULL', nameKey(name));
+// tx içinde çağrılır. Firma adıyla müşteriyi bulur; yoksa oluşturur. Müşteri kimliğini döndürür.
+function resolveCustomer(firma, kaynak, user, t = Date.now()) {
+  const ex = custByName(firma);
+  if (ex) return ex.id;
+  const id = newId(), data = { ad: nameKey(firma), kaynak: cleanSource(kaynak) };
+  run('INSERT INTO customers(id,name_key,data,created_at,created_by,updated_at,updated_by) VALUES(?,?,?,?,?,?,?)', id, data.ad, JSON.stringify(data), t, user, t, user);
+  custLog(id, t, user, [{ f: '_new' }]);
+  return id;
+}
+function createCustomer(input, user) {
+  const data = {};
+  for (const k of CFIELDS) data[k] = cleanC(k, input[k]);
+  if (!data.ad) fail(400, 'Müşteri adı gerekli.');
+  if (!data.kaynak) fail(400, 'Müşterinin nereden geldiğini seçin.');
+  return tx(() => {
+    if (custByName(data.ad)) fail(409, 'Bu adla kayıtlı bir müşteri zaten var.');
+    const id = newId(), t = Date.now();
+    run('INSERT INTO customers(id,name_key,data,created_at,created_by,updated_at,updated_by) VALUES(?,?,?,?,?,?,?)', id, data.ad, JSON.stringify(data), t, user, t, user);
+    custLog(id, t, user, [{ f: '_new' }]);
+    return custRow(get('SELECT * FROM customers WHERE id=?', id));
+  });
+}
+// Ad değişirse bağlı işlerin firma adı da güncellenir (iş geçmişine yazılır).
+function patchCustomer(id, input, user) {
+  return tx(() => {
+    const r = get('SELECT * FROM customers WHERE id=? AND deleted_at IS NULL', id);
+    if (!r) fail(404, 'Müşteri bulunamadı. Başka biri silmiş olabilir.');
+    const data = JSON.parse(r.data), changes = [];
+    for (const k of CFIELDS) {
+      if (!(k in input)) continue;
+      const v = cleanC(k, input[k]);
+      if ((data[k] ?? null) !== (v ?? null)) { changes.push({ f: k, o: data[k] ?? null, n: v }); data[k] = v; }
+    }
+    if (!data.ad) fail(400, 'Müşteri adı boş bırakılamaz.');
+    if (!changes.length) return custRow(r);
+    const t = Date.now();
+    if (data.ad !== r.name_key) {
+      const other = custByName(data.ad);
+      if (other && other.id !== id) { const e = new HttpError(409, 'Bu adla kayıtlı başka bir müşteri var.'); e.extra = { exists: other.id }; throw e; }
+      for (const j of all('SELECT * FROM jobs WHERE deleted_at IS NULL')) {
+        const jd = JSON.parse(j.data);
+        if (jd.musteriId !== id || jd.firma === data.ad) continue;
+        logChange(j.id, t, user, [{ f: 'firma', o: jd.firma, n: data.ad }]);
+        jd.firma = data.ad;
+        run('UPDATE jobs SET data=?,updated_at=?,updated_by=? WHERE id=?', JSON.stringify(jd), t, user, j.id);
+      }
+    }
+    run('UPDATE customers SET name_key=?,data=?,updated_at=?,updated_by=? WHERE id=?', data.ad, JSON.stringify(data), t, user, id);
+    custLog(id, t, user, changes);
+    return custRow(get('SELECT * FROM customers WHERE id=?', id));
+  });
+}
+// Aynı müşterinin iki kaydını tek kayıtta toplar: işler hedefe taşınır, boş alanlar hedefe tamamlanır.
+function mergeCustomer(fromId, intoId, user) {
+  if (fromId === intoId) fail(400, 'Müşteri kendisiyle birleştirilemez.');
+  return tx(() => {
+    const a = get('SELECT * FROM customers WHERE id=? AND deleted_at IS NULL', fromId);
+    const b = get('SELECT * FROM customers WHERE id=? AND deleted_at IS NULL', intoId);
+    if (!a || !b) fail(404, 'Müşteri bulunamadı.');
+    const ad = JSON.parse(a.data), bd = JSON.parse(b.data), t = Date.now(), filled = [];
+    for (const k of CFIELDS) if (bd[k] == null && ad[k] != null) { filled.push({ f: k, o: null, n: ad[k] }); bd[k] = ad[k]; }
+    let moved = 0;
+    for (const j of all('SELECT * FROM jobs WHERE deleted_at IS NULL')) {
+      const jd = JSON.parse(j.data);
+      if (jd.musteriId !== fromId) continue;
+      const ch = [{ f: 'firma', o: jd.firma, n: bd.ad }];
+      jd.firma = bd.ad; jd.musteriId = intoId; moved++;
+      run('UPDATE jobs SET data=?,updated_at=?,updated_by=? WHERE id=?', JSON.stringify(jd), t, user, j.id);
+      if (ch[0].o !== ch[0].n) logChange(j.id, t, user, ch);
+    }
+    run('UPDATE customers SET data=?,updated_at=?,updated_by=? WHERE id=?', JSON.stringify(bd), t, user, intoId);
+    custLog(intoId, t, user, [{ f: '_merge', n: ad.ad }, ...filled]);
+    run('UPDATE customers SET deleted_at=? WHERE id=?', t, fromId);
+    custLog(fromId, t, user, [{ f: '_merged', n: bd.ad }]);
+    return { moved, customer: custRow(get('SELECT * FROM customers WHERE id=?', intoId)) };
+  });
+}
+// Açılışta: müşteriye bağlı olmayan her işi firma adına göre müşteriye bağla (eski kayıtlar için).
+// Kaynağı bilinmeyen müşteriler "kaynak belirsiz" olarak açılır; kullanıcı sonra doldurur.
+function linkOrphanJobs() {
+  return tx(() => {
+    let n = 0;
+    for (const j of all('SELECT * FROM jobs WHERE deleted_at IS NULL')) {
+      const jd = JSON.parse(j.data);
+      if (jd.musteriId && get('SELECT 1 FROM customers WHERE id=? AND deleted_at IS NULL', jd.musteriId)) continue;
+      if (!jd.firma) continue;
+      jd.musteriId = resolveCustomer(jd.firma, null, j.created_by || '', j.created_at);
+      run('UPDATE jobs SET data=? WHERE id=?', JSON.stringify(jd), j.id);
+      n++;
+    }
+    return n;
+  });
+}
+
 function createJob(input, user) {
   const data = {};
   for (const k of FIELDS) data[k] = clean(k, input[k]);
   if (!data.firma || !data.tanim) fail(400, 'Firma ve iş tanımı gerekli.');
   const id = newId(), t = Date.now();
   tx(() => {
+    data.musteriId = resolveCustomer(data.firma, input.yeniKaynak, user, t);
     run('INSERT INTO jobs(id,data,created_at,created_by,updated_at,updated_by) VALUES(?,?,?,?,?,?)', id, JSON.stringify(data), t, user, t, user);
     logChange(id, t, user, [{ f: '_new' }]);
   });
@@ -166,6 +299,7 @@ function patchJob(id, input, user) {
     if (!data.firma || !data.tanim) fail(400, 'Firma ve iş tanımı boş bırakılamaz.');
     if (changes.length) {
       const t = Date.now();
+      if (changes.some(c => c.f === 'firma') || !data.musteriId) data.musteriId = resolveCustomer(data.firma, input.yeniKaynak, user, t);
       run('UPDATE jobs SET data=?,updated_at=?,updated_by=? WHERE id=?', JSON.stringify(data), t, user, id);
       logChange(id, t, user, changes);
     }
@@ -176,19 +310,43 @@ function patchJob(id, input, user) {
 /* ---------- yedek / içe aktarma ---------- */
 function exportData() {
   return {
-    format: 'cizgi-is-takip', version: 1, exportedAt: new Date().toISOString(),
+    format: 'cizgi-is-takip', version: 2, exportedAt: new Date().toISOString(),
+    sources: getSources(),
+    customers: all('SELECT * FROM customers WHERE deleted_at IS NULL ORDER BY created_at').map(custRow),
     jobs: all('SELECT * FROM jobs WHERE deleted_at IS NULL ORDER BY created_at').map(jobRow),
-    log: all('SELECT job_id,t,user,changes FROM joblog ORDER BY id').map(l => ({ jobId: l.job_id, t: l.t, user: l.user, changes: JSON.parse(l.changes) }))
+    log: all('SELECT job_id,t,user,changes FROM joblog ORDER BY id').map(l => ({ jobId: l.job_id, t: l.t, user: l.user, changes: JSON.parse(l.changes) })),
+    custLog: all('SELECT cust_id,t,user,changes FROM custlog ORDER BY id').map(l => ({ custId: l.cust_id, t: l.t, user: l.user, changes: JSON.parse(l.changes) }))
   };
 }
 // Claude'un hazırladığı aktarım dosyası ya da bu uygulamanın yedeği. Yalnızca boş sisteme.
 // Kullanıcı adı "__owner__" olan kayıtlar, içe aktaran yöneticinin adıyla yazılır.
 function importData(d, me) {
   if (!d || d.format !== 'cizgi-is-takip') fail(400, 'Bu dosya İş Takibi aktarım dosyası değil.');
-  if (get('SELECT COUNT(*) AS n FROM jobs').n > 0) fail(409, 'İçe aktarma yalnızca boş sisteme yapılabilir; sistemde zaten iş var.');
+  if (get('SELECT COUNT(*) AS n FROM jobs').n > 0 || get('SELECT COUNT(*) AS n FROM customers').n > 0) fail(409, 'İçe aktarma yalnızca boş sisteme yapılabilir; sistemde zaten kayıt var.');
   const who = u => (u === '__owner__' || !u ? me.name : str(u, 60));
   const jobs = Array.isArray(d.jobs) ? d.jobs : [], log = Array.isArray(d.log) ? d.log : [];
-  return tx(() => {
+  const custs = Array.isArray(d.customers) ? d.customers : [], clog = Array.isArray(d.custLog) ? d.custLog : [];
+  const res = tx(() => {
+    if (Array.isArray(d.sources) && d.sources.length) {
+      const s = [...new Set(d.sources.map(x => nameKey(str(x, 40))).filter(Boolean))].slice(0, 30);
+      run("INSERT INTO settings(key,value) VALUES('sources',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", JSON.stringify(s));
+    }
+    const cids = new Set();
+    for (const c of custs) {
+      const id = str(c.id, 40); if (!/^[\w-]{4,40}$/.test(id) || cids.has(id)) fail(400, 'Aktarım dosyasında geçersiz müşteri kimliği var.');
+      const data = {};
+      for (const k of CFIELDS) {
+        try { data[k] = cleanC(k, c[k]); } catch (e) { fail(400, `${str(c.ad, 40) || id} müşterisinde "${k}" alanı geçersiz.`); }
+      }
+      if (!data.ad || custByName(data.ad)) fail(400, `Aktarım dosyasında adı boş ya da tekrarlanan müşteri var: ${data.ad || id}`);
+      cids.add(id);
+      const cr = Number(c.createdAt) || Date.now(), up = Number(c.updatedAt) || cr;
+      run('INSERT INTO customers(id,name_key,data,created_at,created_by,updated_at,updated_by) VALUES(?,?,?,?,?,?,?)', id, data.ad, JSON.stringify(data), cr, who(c.createdBy), up, who(c.updatedBy));
+    }
+    for (const l of clog) {
+      if (!cids.has(l.custId) || !Array.isArray(l.changes)) continue;
+      custLog(l.custId, Number(l.t) || Date.now(), who(l.user), l.changes.slice(0, 20).map(c => ({ f: str(c.f, 20), o: c.o ?? null, n: c.n ?? null })));
+    }
     const ids = new Set();
     for (const j of jobs) {
       const id = str(j.id, 40); if (!/^[\w-]{4,40}$/.test(id) || ids.has(id)) fail(400, 'Aktarım dosyasında geçersiz iş kimliği var.');
@@ -198,6 +356,7 @@ function importData(d, me) {
         try { data[k] = clean(k, j[k]); }
         catch (e) { fail(400, `${str(j.firma, 40) || id} kaydında "${k}" alanı geçersiz.`); }
       }
+      if (typeof j.musteriId === 'string' && cids.has(j.musteriId)) data.musteriId = j.musteriId;
       const c = Number(j.createdAt) || Date.now(), u = Number(j.updatedAt) || c;
       run('INSERT INTO jobs(id,data,created_at,created_by,updated_at,updated_by) VALUES(?,?,?,?,?,?)', id, JSON.stringify(data), c, who(j.createdBy), u, who(j.updatedBy));
     }
@@ -207,8 +366,11 @@ function importData(d, me) {
       logChange(l.jobId, Number(l.t) || Date.now(), who(l.user), l.changes.slice(0, 20).map(c => ({ f: str(c.f, 20), o: c.o ?? null, n: c.n ?? null })));
       n++;
     }
-    return { jobs: ids.size, log: n };
+    return { jobs: ids.size, log: n, customers: cids.size };
   });
+  linkOrphanJobs();
+  res.customers =get('SELECT COUNT(*) AS n FROM customers WHERE deleted_at IS NULL').n;
+  return res;
 }
 
 /* ---------- günlük yedek ---------- */
@@ -221,6 +383,7 @@ function dailyBackup() {
   } catch (e) { console.error('Yedek alınamadı:', e.message); }
 }
 dailyBackup();
+try { const n = linkOrphanJobs(); if (n) console.log(n + ' iş müşteri kayıtlarına bağlandı'); } catch (e) { console.error('Müşteri bağlama hatası:', e.message); }
 setInterval(dailyBackup, 3600e3).unref();
 setInterval(() => run('DELETE FROM sessions WHERE expires<?', Date.now()), 6 * 3600e3).unref();
 
@@ -279,7 +442,48 @@ async function handle(req, res) {
   if (m === 'GET' && p === '/api/me') return send(res, 200, me);
 
   if (m === 'GET' && p === '/api/state') {
-    return send(res, 200, { me, stages: STAGES, jobs: all('SELECT * FROM jobs WHERE deleted_at IS NULL').map(jobRow) });
+    return send(res, 200, { me, stages: STAGES, sources: getSources(),
+      customers: all('SELECT * FROM customers WHERE deleted_at IS NULL').map(custRow),
+      jobs: all('SELECT * FROM jobs WHERE deleted_at IS NULL').map(jobRow) });
+  }
+
+  /* müşteriler */
+  let mm0;
+  if (m === 'POST' && p === '/api/customers') return send(res, 200, createCustomer(await readJson(req), me.name));
+  if ((mm0 = p.match(/^\/api\/customers\/([\w-]{4,40})(\/log|\/merge)?$/))) {
+    const id = mm0[1];
+    if (m === 'GET' && mm0[2] === '/log') {
+      return send(res, 200, all('SELECT t,user,changes FROM custlog WHERE cust_id=? ORDER BY t DESC, id DESC LIMIT 200', id).map(l => ({ t: l.t, user: l.user, changes: JSON.parse(l.changes) })));
+    }
+    if (m === 'POST' && mm0[2] === '/merge') {
+      const b = await readJson(req);
+      return send(res, 200, mergeCustomer(id, str(b.into, 40), me.name));
+    }
+    if (m === 'PATCH' && !mm0[2]) return send(res, 200, patchCustomer(id, await readJson(req), me.name));
+    if (m === 'DELETE' && !mm0[2]) {
+      needAdmin();
+      tx(() => {
+        if (!get('SELECT 1 FROM customers WHERE id=? AND deleted_at IS NULL', id)) fail(404, 'Müşteri bulunamadı.');
+        if (all('SELECT data FROM jobs WHERE deleted_at IS NULL').some(j => JSON.parse(j.data).musteriId === id)) fail(409, 'Bu müşteriye bağlı işler var; önce işleri silin ya da müşteriyi başka bir kayıtla birleştirin.');
+        const t = Date.now();
+        run('UPDATE customers SET deleted_at=? WHERE id=?', t, id);
+        custLog(id, t, me.name, [{ f: '_del' }]);
+      });
+      return send(res, 200, { ok: true });
+    }
+  }
+  if (m === 'PUT' && p === '/api/sources') {
+    needAdmin();
+    const b = await readJson(req);
+    if (!Array.isArray(b.sources)) fail(400, 'Geçersiz liste.');
+    const list = [...new Set(b.sources.map(x => nameKey(str(x, 40))).filter(Boolean))];
+    if (!list.length) fail(400, 'En az bir kaynak olmalı.');
+    if (list.length > 30) fail(400, 'En fazla 30 kaynak olabilir.');
+    const used = new Set(all('SELECT data FROM customers WHERE deleted_at IS NULL').map(c => JSON.parse(c.data).kaynak).filter(Boolean));
+    const missing = [...used].filter(s => !list.includes(s));
+    if (missing.length) fail(409, `${missing.join(', ')} kaynağına bağlı müşteriler var; önce o müşterilerin kaynağını değiştirin.`);
+    run("INSERT INTO settings(key,value) VALUES('sources',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", JSON.stringify(list));
+    return send(res, 200, { sources: list });
   }
 
   /* işler */
@@ -351,7 +555,7 @@ async function handle(req, res) {
 http.createServer((req, res) => {
   handle(req, res).catch(e => {
     if (res.headersSent) return res.end();
-    if (e instanceof HttpError) return send(res, e.code, { error: e.message });
+    if (e instanceof HttpError) return send(res, e.code, { error: e.message, ...(e.extra || {}) });
     console.error(e);
     send(res, 500, { error: 'Sunucu hatası. Tekrar deneyin.' });
   });
