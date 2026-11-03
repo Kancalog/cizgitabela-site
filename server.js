@@ -39,6 +39,29 @@ function tx(fn) {
   try { const r = fn(); db.exec('COMMIT'); return r; }
   catch (e) { try { db.exec('ROLLBACK'); } catch (_) {} throw e; }
 }
+// Kod geri verme kuralı: 24 saatten yeni bir ürün gruptan çıkarsa (silinme ya da başka gruba taşınma)
+// ve sırada en sonda kalıyorsa kodu geri verilir. Daha eski ürünlerin kodu "floor" ile korunur.
+const RECENT_MS = 24 * 3600e3;
+if (!all('PRAGMA table_info(pgroups)').some(c => c.name === 'floor')) {
+  db.exec('ALTER TABLE pgroups ADD COLUMN floor INTEGER NOT NULL DEFAULT 0');
+  // Tek seferlik: uygulama yeni olduğu için şimdiye kadarki silmeler yanlış girişlerdi; sondaki boşlukları kapat.
+  for (const g of all('SELECT id FROM pgroups')) {
+    const r = get('SELECT MAX(num) AS m FROM products WHERE group_id=?', g.id);
+    run('UPDATE pgroups SET next=? WHERE id=?', (r.m || 0) + 1, g.id);
+  }
+}
+function leaveGroup(prod) {
+  const g = get('SELECT * FROM pgroups WHERE id=?', prod.group_id);
+  if (!g) return false;
+  if (Date.now() - prod.created_at < RECENT_MS) {
+    const r = get('SELECT MAX(num) AS m FROM products WHERE group_id=?', g.id);
+    const next = Math.max(r.m || 0, g.floor || 0) + 1;
+    run('UPDATE pgroups SET next=? WHERE id=?', next, g.id);
+    return next <= prod.num;
+  }
+  if (prod.num > (g.floor || 0)) run('UPDATE pgroups SET floor=? WHERE id=?', prod.num, g.id);
+  return false;
+}
 const setting = k => { const r = get('SELECT value FROM settings WHERE key=?', k); return r ? r.value : null; };
 const setSetting = (k, v) => run('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', k, v);
 const newId = () => crypto.randomBytes(10).toString('hex');
@@ -123,7 +146,7 @@ const photoPath = id => (/^[a-f0-9]{20,40}$/.test(id) ? path.join(PHOTOS, id + '
 function productRow(p) {
   return { id: p.id, code: p.code, num: p.num, name: p.name, groupId: p.group_id, stock: p.stock, min: p.min, order: p.ord, photo: p.photo, price: p.price, cost: p.cost, createdAt: p.created_at };
 }
-function groupRow(g) { return { id: g.id, name: g.name, prefix: g.prefix, order: g.ord, next: g.next }; }
+function groupRow(g) { return { id: g.id, name: g.name, prefix: g.prefix, order: g.ord, next: g.next, floor: g.floor || 0 }; }
 function logMove(m, user) {
   const t = Date.now();
   run('INSERT INTO moves(t,day,pid,code,name,d,after,kind,note,cost,user) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
@@ -193,7 +216,7 @@ function importData(d) {
   for (const [id, b64] of Object.entries(photos)) { const f = photoPath(id); if (f) fs.writeFileSync(f, Buffer.from(String(b64), 'base64')); }
   return tx(() => {
     run('DELETE FROM pgroups');
-    for (const g of d.groups || []) run('INSERT INTO pgroups(id,name,prefix,ord,next) VALUES(?,?,?,?,?)', str(g.id, 40), str(g.name, 60), normPrefix(g.prefix), int(g.order) || 0, int(g.next) || 1);
+    for (const g of d.groups || []) run('INSERT INTO pgroups(id,name,prefix,ord,next,floor) VALUES(?,?,?,?,?,?)', str(g.id, 40), str(g.name, 60), normPrefix(g.prefix), int(g.order) || 0, int(g.next) || 1, Math.max(0, int(g.floor) || 0));
     for (const p of d.products || []) run('INSERT INTO products(id,code,num,name,group_id,stock,min,ord,photo,price,cost,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
       str(p.id, 40), str(p.code, 20), int(p.num) || 0, str(p.name, 80), str(p.groupId, 40), Math.max(0, int(p.stock) || 0), Math.max(0, int(p.min) || 0), int(p.order) || 0,
       p.photo ? str(p.photo, 40) : null, num(p.price), num(p.cost), int(p.createdAt) || Date.now());
@@ -352,6 +375,7 @@ async function handle(req, res) {
           const n = nextNumber(g);
           run('UPDATE products SET group_id=?,num=?,code=?,ord=? WHERE id=?', g.id, n, fmt(g.prefix, n), nextOrder(g.id), id);
           run('UPDATE pgroups SET next=? WHERE id=?', n + 1, g.id);
+          leaveGroup(prod);
         }
         return get('SELECT * FROM products WHERE id=?', id);
       });
@@ -393,11 +417,11 @@ async function handle(req, res) {
         const prod = get('SELECT * FROM products WHERE id=?', id); if (!prod) fail(404, 'Ürün bulunamadı.');
         logMove({ pid: id, code: prod.code, name: prod.name, d: -prod.stock, after: 0, kind: 'sil', note: 'Ürün silindi' }, me.name);
         run('DELETE FROM products WHERE id=?', id);
-        return prod;
+        return { ...prod, released: leaveGroup(prod) };
       });
       const f = prod.photo && photoPath(prod.photo);
       if (f) fs.rm(f, { force: true }, () => {});
-      return send(res, 200, { ok: true });
+      return send(res, 200, { ok: true, codeReleased: prod.released });
     }
   }
 

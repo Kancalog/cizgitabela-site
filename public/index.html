@@ -579,7 +579,7 @@ async function moveGroup(id,gid){
 async function reorder(id,dir){try{await api('POST','/api/products/'+id+'/reorder',{dir});await refresh()}catch(e){toast(e.message)}}
 async function removeProduct(id){
   const p=products.find(x=>x.id===id);
-  try{await api('DELETE','/api/products/'+id);products=products.filter(x=>x.id!==id);render();toast((p?p.code:'Ürün')+' silindi')}
+  try{const r=await api('DELETE','/api/products/'+id);await refresh();toast((p?p.code:'Ürün')+' silindi'+(r.codeReleased?'. Bu kod sıradaki ürüne verilecek.':''))}
   catch(e){toast(e.message)}
 }
 
