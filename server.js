@@ -387,6 +387,79 @@ try { const n = linkOrphanJobs(); if (n) console.log(n + ' iş müşteri kayıtl
 setInterval(dailyBackup, 3600e3).unref();
 setInterval(() => run('DELETE FROM sessions WHERE expires<?', Date.now()), 6 * 3600e3).unref();
 
+/* ---------- WhatsApp günlük özet (Meta WhatsApp Cloud API) ---------- */
+// Ayarlar ortam değişkenlerinden gelir; anahtar koda ya da veritabanına yazılmaz.
+const WA = {
+  token: process.env.WA_TOKEN || '', phoneId: process.env.WA_PHONE_ID || '', to: (d => d.length === 11 && d[0] === '0' ? '9' + d : d.length === 10 && d[0] === '5' ? '90' + d : d)((process.env.WA_TO || '').replace(/\D/g, '')),
+  template: process.env.WA_TEMPLATE || 'gunluk_ozet', lang: process.env.WA_LANG || 'tr',
+  hour: Number(process.env.WA_HOUR || 19), ver: process.env.WA_API_VERSION || 'v23.0', base: process.env.WA_API_BASE || 'https://graph.facebook.com'
+};
+const waReady = () => !!(WA.token && WA.phoneId && WA.to);
+const setting = k => { const r = get('SELECT value FROM settings WHERE key=?', k); return r ? r.value : null; };
+const setSetting = (k, v) => run('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', k, v);
+const srcTitleTR = s => s.toLocaleLowerCase('tr').replace(/(^|\s)\S/g, c => c.toLocaleUpperCase('tr'));
+// Uygulamadaki "Günlük" ve "İşler" sekmesiyle aynı tanımlar.
+function dailySummary(day = dayKey(new Date())) {
+  const jobs = all('SELECT * FROM jobs WHERE deleted_at IS NULL').map(jobRow);
+  const custs = new Map(all('SELECT * FROM customers WHERE deleted_at IS NULL').map(r => [r.id, JSON.parse(r.data)]));
+  const jday = j => j.tarih || dayKey(new Date(j.createdAt));
+  const done = j => j.durum === 'TESLİM EDİLDİ';
+  const tomorrow = dayKey(new Date(Date.now() + 864e5));
+  const today = jobs.filter(j => jday(j) === day);
+  const bySrc = new Map();
+  for (const j of today) { const c = custs.get(j.musteriId); const k = c && c.kaynak ? srcTitleTR(c.kaynak) : 'Belirsiz'; bySrc.set(k, (bySrc.get(k) || 0) + 1); }
+  return {
+    day, n: today.length,
+    sources: [...bySrc].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(', ') || 'yok',
+    won: today.filter(j => j.alindi === 'EVET').length,
+    waiting: jobs.filter(j => !done(j) && j.alindi !== 'HAYIR' && j.donus !== 'EVET').length,
+    late: jobs.filter(j => !done(j) && j.alindi !== 'HAYIR' && j.termin && j.termin < day).length,
+    dueTomorrow: jobs.filter(j => !done(j) && j.alindi !== 'HAYIR' && j.termin === tomorrow).length
+  };
+}
+// Şablon gövdesi (Meta'da onaylatılacak, 7 değişken):
+// Çizgi günlük özet ({{1}}): Bugün {{2}} iş girdi. Kaynaklar: {{3}}. Alınan: {{4}}. Dönüş bekleyen: {{5}}. Geciken: {{6}}. Yarın termini olan: {{7}}.
+async function sendWhatsApp(s) {
+  if (!waReady()) fail(400, 'WhatsApp ayarları sunucuda eksik.');
+  const tpl = WA.template === 'hello_world'
+    ? { name: 'hello_world', language: { code: 'en_US' } } // yalnızca bağlantıyı denemek için
+    : { name: WA.template, language: { code: WA.lang }, components: [{ type: 'body', parameters:
+        [s.day.split('-').reverse().join('.'), s.n, s.sources, s.won, s.waiting, s.late, s.dueTomorrow].map(v => ({ type: 'text', text: String(v) })) }] };
+  let r, j = null;
+  try {
+    r = await fetch(`${WA.base}/${WA.ver}/${encodeURIComponent(WA.phoneId)}/messages`, {
+      method: 'POST', headers: { Authorization: 'Bearer ' + WA.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to: WA.to, type: 'template', template: tpl }),
+      signal: AbortSignal.timeout(15000)
+    });
+    j = await r.json().catch(() => null);
+  } catch (e) { setSetting('wa_error', 'Meta sunucusuna ulaşılamadı: ' + e.message); fail(502, 'Meta sunucusuna ulaşılamadı.'); }
+  if (!r.ok) {
+    const msg = (j && j.error && (j.error.error_user_msg || j.error.message)) || ('HTTP ' + r.status);
+    setSetting('wa_error', dayKey(new Date()) + ' · ' + msg);
+    fail(502, 'WhatsApp gönderilemedi: ' + msg);
+  }
+  setSetting('wa_error', '');
+  setSetting('wa_last', String(Date.now()));
+  return { ok: true };
+}
+// Her dakika bakar: saat geldiyse ve bugün gönderilmediyse gönderir. Sunucu geç açılırsa o gün yine bir kez gönderir.
+let waBusy = false;
+async function waTick() {
+  if (!waReady() || waBusy) return;
+  const now = new Date(), today = dayKey(now);
+  if (now.getHours() < WA.hour || setting('wa_day') === today) return;
+  if (setting('wa_fail_day') === today && Number(setting('wa_fails') || 0) >= 3) return; // günde en fazla 3 deneme
+  waBusy = true;
+  try { await sendWhatsApp(dailySummary(today)); setSetting('wa_day', today); console.log('WhatsApp özeti gönderildi'); }
+  catch (e) {
+    const n = setting('wa_fail_day') === today ? Number(setting('wa_fails') || 0) + 1 : 1;
+    setSetting('wa_fail_day', today); setSetting('wa_fails', String(n));
+    console.error('WhatsApp özeti gönderilemedi:', e.message);
+  } finally { waBusy = false; }
+}
+setInterval(() => { waTick().catch(() => {}); }, 60e3).unref();
+
 /* ---------- istek yönlendirme ---------- */
 const INDEX = fs.readFileSync(path.join(__dirname, 'public', 'index.html'));
 const SEC_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin' };
@@ -472,6 +545,14 @@ async function handle(req, res) {
       return send(res, 200, { ok: true });
     }
   }
+  if (m === 'GET' && p === '/api/wa') {
+    needAdmin();
+    const s = dailySummary();
+    return send(res, 200, { ready: waReady(), to: WA.to ? '+' + WA.to.slice(0, 4) + '•••' + WA.to.slice(-4) : null, hour: WA.hour, template: WA.template,
+      last: Number(setting('wa_last')) || null, error: setting('wa_error') || null,
+      preview: `Çizgi günlük özet (${s.day.split('-').reverse().join('.')}): Bugün ${s.n} iş girdi. Kaynaklar: ${s.sources}. Alınan: ${s.won}. Dönüş bekleyen: ${s.waiting}. Geciken: ${s.late}. Yarın termini olan: ${s.dueTomorrow}.` });
+  }
+  if (m === 'POST' && p === '/api/wa/test') { needAdmin(); return send(res, 200, await sendWhatsApp(dailySummary())); }
   if (m === 'PUT' && p === '/api/sources') {
     needAdmin();
     const b = await readJson(req);

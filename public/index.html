@@ -292,6 +292,11 @@ legend{font-weight:600;font-size:13px;color:var(--muted);text-transform:uppercas
         </div>
         <span class="msg" id="uMsg"></span>
       </fieldset>
+      <fieldset class="adm" style="grid-column:1/-1"><legend>WhatsApp günlük özet</legend>
+        <span class="hint" id="waStatus">Yükleniyor…</span>
+        <span class="hint" id="waPreview" style="background:var(--surface2);border-radius:6px;padding:7px 9px;color:var(--ink)"></span>
+        <div class="inl"><button class="btn primary small" id="waTest" type="button">Şimdi test mesajı gönder</button><span class="msg" id="waMsg"></span></div>
+      </fieldset>
       <fieldset class="adm" style="grid-column:1/-1"><legend>Müşteri kaynakları</legend>
         <span class="hint">Müşterinin kimden ya da nereden geldiği. Yeni bir ortak ya da kanal eklenirse buraya yazın. Müşterisi olan kaynak silinemez.</span>
         <div class="srcedit" id="srcEdit"></div>
@@ -943,7 +948,20 @@ async function loadUsers(){
     $("#users").innerHTML=us.map(u=>`<div class="urow" data-u="${u.id}"><b>${esc(u.name)}</b><span class="role">${esc(u.username)} · ${u.role==="admin"?"yönetici":"kullanıcı"}${u.id===me.id?" · siz":""}</span><span class="sp"></span>${u.id===me.id?"":`<input type="password" class="inp upw" style="width:150px;flex:0 1 150px;font-size:14px;padding:6px 8px" placeholder="Yeni şifre" autocomplete="new-password" aria-label="${esc(u.name)} için yeni şifre"><button class="btn small upwSave" type="button">Şifreyi değiştir</button><button class="btn small udel" type="button">Sil</button>`}</div>`).join("");
   }catch(e){$("#uMsg").textContent=e.message}
 }
-$("#setOpen").onclick=()=>{const p=$("#setPanel");p.hidden=!p.hidden;if(!p.hidden)loadUsers()};
+async function loadWa(){
+  if(!isAdmin())return;
+  try{
+    const w=await api("GET","/api/wa");
+    $("#waStatus").innerHTML=w.ready
+      ?`Açık · her gün saat <b>${w.hour}:00</b>'da <b>${esc(w.to)}</b> numarasına gönderilir.${w.last?` Son gönderim: ${fmtStamp(w.last)}.`:" Henüz gönderilmedi."}${w.error?`<br><span style="color:var(--danger)">Son hata: ${esc(w.error)}</span>`:""}`
+      :`Kapalı · Meta WhatsApp bilgileri sunucuya henüz girilmedi.`;
+    $("#waPreview").textContent=w.preview;$("#waTest").disabled=!w.ready;
+  }catch(e){$("#waStatus").textContent=e.message}
+}
+$("#waTest").onclick=async()=>{$("#waMsg").textContent="Gönderiliyor…";
+  try{await api("POST","/api/wa/test");$("#waMsg").textContent="Gönderildi, telefonuna bak.";loadWa()}
+  catch(e){$("#waMsg").textContent=e.message;loadWa()}};
+$("#setOpen").onclick=()=>{const p=$("#setPanel");p.hidden=!p.hidden;if(!p.hidden){loadUsers();loadWa()}};
 $("#setClose").onclick=()=>{$("#setPanel").hidden=true};
 $("#myPwSave").onclick=async()=>{
   try{await api("PUT","/api/users/"+me.id+"/password",{password:$("#myPw").value});$("#myPw").value="";$("#myPwMsg").textContent="Şifreniz değişti."}
